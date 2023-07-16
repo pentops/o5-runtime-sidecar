@@ -2,8 +2,10 @@ package protoread
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
@@ -11,10 +13,32 @@ import (
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"gopkg.daemonl.com/log"
 )
 
 // FetchServices fetches the full reflection descriptor of all exposed services from a grpc server
 func FetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
+	for {
+		services, err := fetchServices(ctx, conn)
+		if err == nil {
+			log.WithField(ctx, "services", len(services)).Info("fetched services")
+			return services, nil
+		}
+		log.WithError(ctx, err).Error("fetching services. Retrying")
+
+		if errors.Is(err, context.Canceled) {
+			return nil, err
+		}
+
+		select {
+		case <-time.After(time.Second):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+}
+
+func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
 
 	client := grpc_reflection_v1alpha.NewServerReflectionClient(conn)
 

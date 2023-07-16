@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -21,8 +23,9 @@ import (
 var Version string
 
 var config = struct {
-	PublicPort int    `env:"PUBLIC_PORT" default:"8080"`
-	Service    string `env:"SERVICE_ENDPOINT"`
+	PublicPort  int    `env:"PUBLIC_PORT" default:"8080"`
+	Service     string `env:"SERVICE_ENDPOINT"`
+	StaticFiles string `env:"STATIC_FILES" default:""`
 }{}
 
 func main() {
@@ -49,18 +52,30 @@ func run(ctx context.Context) error {
 	// TODO: Register a real one?
 	var s3Client s3iface.S3API
 
-	conn, err := grpc.DialContext(ctx, config.Service, grpc.WithInsecure())
+	conn, err := grpc.DialContext(ctx, config.Service, grpc.WithInsecure(), grpc.WithConnectParams(grpc.ConnectParams{
+		Backoff: backoff.Config{
+			BaseDelay:  1 * time.Second,
+			Multiplier: 1.6,
+			MaxDelay:   120 * time.Second,
+			Jitter:     0.2,
+		},
+		MinConnectTimeout: 20 * time.Second,
+	}))
 	if err != nil {
-		return err
+		return fmt.Errorf("dial: %w", err)
 	}
 	defer conn.Close()
 
 	services, err := protoread.FetchServices(ctx, conn)
 	if err != nil {
-		return err
+		return fmt.Errorf("fetch: %w", err)
 	}
 
 	router := proxy.NewRouter()
+
+	if config.StaticFiles != "" {
+		router.SetNotFoundHandler(http.FileServer(http.Dir(config.StaticFiles)))
+	}
 	// TODO: CORS
 	// TODO: Auth
 	// TODO: Logging

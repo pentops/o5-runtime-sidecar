@@ -45,8 +45,11 @@ func NewRouter() *Router {
 	}
 }
 
+func (rr *Router) SetNotFoundHandler(handler http.Handler) {
+	rr.router.NotFoundHandler = handler
+}
+
 func (rr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	rr.router.NotFoundHandler = http.FileServer(http.Dir("./static"))
 	rr.router.ServeHTTP(w, r)
 }
 
