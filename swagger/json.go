@@ -23,7 +23,19 @@ func Value[T any](val T) Optional[T] {
 	}
 }
 
+type jsonFieldMapper interface {
+	jsonFieldMap(map[string]json.RawMessage) error
+}
+
 func jsonFieldMap(object interface{}, m map[string]json.RawMessage) error {
+
+	if jfm, ok := object.(jsonFieldMapper); ok {
+		return jfm.jsonFieldMap(m)
+	}
+
+	if _, ok := object.(json.Marshaler); ok {
+		return fmt.Errorf("%T implements json.Marshaler, it should implement jsonFieldMapper", object)
+	}
 
 	val := reflect.ValueOf(object)
 	if val.Kind() != reflect.Struct {
@@ -74,8 +86,6 @@ func jsonFieldMap(object interface{}, m map[string]json.RawMessage) error {
 			return err
 		}
 
-		fmt.Printf("FIELD %s: %T %s\n", name, iv, asJSON)
-
 		m[name] = json.RawMessage(asJSON)
 	}
 
@@ -89,7 +99,6 @@ type MapItem interface {
 type OrderedMap[T MapItem] []T
 
 func (om OrderedMap[T]) MarshalJSON() ([]byte, error) {
-	fmt.Printf("MM")
 	fields := make([]string, len(om))
 	for idx, field := range om {
 		val, err := json.Marshal(field)

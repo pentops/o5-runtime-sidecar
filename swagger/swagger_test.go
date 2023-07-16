@@ -12,8 +12,8 @@ func TestPathMap(t *testing.T) {
 
 	dd := Document{
 		Paths: PathSet{
-			PathItem{
-				Operation{
+			&PathItem{
+				&Operation{
 					OperationHeader: OperationHeader{
 						Method:      "get",
 						Path:        "/foo",
@@ -37,21 +37,21 @@ func TestPathMap(t *testing.T) {
 
 func TestSchema(t *testing.T) {
 
-	object := ObjectItem{
-		debug: "a",
-		Properties: map[string]ObjectProperty{
-			"id": {
+	object := SchemaItem{
+		ItemType: ObjectItem{
+			debug: "a",
+			Properties: []*ObjectProperty{{
+				Name: "id",
 				SchemaItem: SchemaItem{
 					Description: "desc",
 					ItemType: StringItem{
-						StringRules: StringRules{
-							Format: "uuid",
-						},
+						Format:      "uuid",
+						StringRules: StringRules{},
 					},
 				},
 				Required: true,
-			},
-			"number": {
+			}, {
+				Name: "number",
 				SchemaItem: SchemaItem{
 					ItemType: NumberItem{
 						Format: "double",
@@ -61,28 +61,27 @@ func TestSchema(t *testing.T) {
 						},
 					},
 				},
-			},
-			"object": {
+			}, {
+				Name: "object",
 				SchemaItem: SchemaItem{
 					ItemType: ObjectItem{
 						debug: "b",
-						Properties: map[string]ObjectProperty{
-							"foo": {
-								Required: true,
-								SchemaItem: SchemaItem{
-									ItemType: StringItem{},
-								},
+						Properties: []*ObjectProperty{{
+							Name:     "foo",
+							Required: true,
+							SchemaItem: SchemaItem{
+								ItemType: StringItem{},
 							},
-						},
+						}},
 					},
 				},
-			},
-			"ref": {
+			}, {
+				Name: "ref",
 				SchemaItem: SchemaItem{
 					Ref: "#/definitions/foo",
 				},
-			},
-			"oneof": {
+			}, {
+				Name: "oneof",
 				SchemaItem: SchemaItem{
 					OneOf: []SchemaItem{
 						{
@@ -93,6 +92,7 @@ func TestSchema(t *testing.T) {
 						},
 					},
 				},
+			},
 			},
 		},
 	}

@@ -53,6 +53,19 @@ func (rr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rr.router.ServeHTTP(w, r)
 }
 
+func (rr *Router) StaticJSON(path string, document interface{}) error {
+	jb, err := json.Marshal(document)
+	if err != nil {
+		return err
+	}
+
+	rr.router.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(jb) // nolint: errcheck
+	})
+	return nil
+}
+
 func (rr *Router) RegisterService(ss protoreflect.ServiceDescriptor, conn *grpc.ClientConn) error {
 	methods := ss.Methods()
 	name := string(ss.FullName())

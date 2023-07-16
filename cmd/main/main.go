@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
+	"github.com/pentops/o5-runtime-sidecar/swagger"
 	"gopkg.daemonl.com/envconf"
 
 	"gopkg.daemonl.com/log"
@@ -97,6 +98,15 @@ func run(ctx context.Context) error {
 			log.WithField(ctx, "service", name).Error("Unknown service type")
 			// but continue
 		}
+	}
+
+	swaggerDocument, err := swagger.Build(services)
+	if err != nil {
+		return err
+	}
+
+	if err := router.StaticJSON("/swagger.json", swaggerDocument); err != nil {
+		return err
 	}
 
 	srv := http.Server{

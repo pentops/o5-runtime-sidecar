@@ -19,16 +19,20 @@ type Info struct {
 	Version     string `json:"version"`
 }
 
-type PathSet []PathItem
+type PathSet []*PathItem
 
 func (ps PathSet) MarshalJSON() ([]byte, error) {
-	return OrderedMap[PathItem](ps).MarshalJSON()
+	return OrderedMap[*PathItem](ps).MarshalJSON()
 }
 
-type PathItem []Operation
+type PathItem []*Operation
 
 func (pi PathItem) MarshalJSON() ([]byte, error) {
-	return OrderedMap[Operation](pi).MarshalJSON()
+	return OrderedMap[*Operation](pi).MarshalJSON()
+}
+
+func (pi *PathItem) AddOperation(op *Operation) {
+	*pi = append(*pi, op)
 }
 
 func (pi PathItem) MapKey() string {
@@ -56,8 +60,8 @@ type OperationHeader struct {
 
 type Operation struct {
 	OperationHeader
-	Request   *SchemaItem `json:"request,omitempty"`
-	Responses ResponseSet `json:"responses,omitempty"`
+	RequestBody *RequestBody `json:"requestBody,omitempty"`
+	Responses   *ResponseSet `json:"responses,omitempty"`
 }
 
 type ResponseSet []Response
@@ -66,10 +70,23 @@ func (rs ResponseSet) MarshalJSON() ([]byte, error) {
 	return OrderedMap[Response](rs).MarshalJSON()
 }
 
+type RequestBody struct {
+	Description string           `json:"description,omitempty"`
+	Required    bool             `json:"required,omitempty"`
+	Content     OperationContent `json:"content"`
+}
 type Response struct {
-	Code        int         `json:"-"`
-	Description string      `json:"description"`
-	Content     interface{} `json:"content"`
+	Code        int              `json:"-"`
+	Description string           `json:"description"`
+	Content     OperationContent `json:"content"`
+}
+
+type OperationContent struct {
+	JSON *OperationSchema `json:"application/json,omitempty"`
+}
+
+type OperationSchema struct {
+	Schema SchemaItem `json:"schema"`
 }
 
 func (rs Response) MapKey() string {
@@ -100,7 +117,6 @@ type SchemaItem struct {
 	ItemType
 	Description string `json:"description,omitempty"`
 	Mutex       string `json:"x-mutex,omitempty"`
-	EventSubkey string `json:"x-event-subkey,omitempty"`
 }
 
 func (si SchemaItem) MarshalJSON() ([]byte, error) {
@@ -136,14 +152,19 @@ func (si SchemaItem) MarshalJSON() ([]byte, error) {
 	}
 
 	propOut := map[string]json.RawMessage{}
-	if err := jsonFieldMap(si, propOut); err != nil {
+	if err := jsonFieldMap(si.ItemType, propOut); err != nil {
 		return nil, err
 	}
 	propOut["type"], _ = json.Marshal(si.TypeName())
+	if si.Description != "" {
+		propOut["description"], _ = json.Marshal(si.Description)
+	}
+
 	return json.Marshal(propOut)
 }
 
 type StringItem struct {
+	Format string `json:"format,omitempty"`
 	StringRules
 }
 
@@ -152,7 +173,6 @@ func (ri StringItem) TypeName() string {
 }
 
 type StringRules struct {
-	Format    string  `json:"format,omitempty"`
 	Pattern   string  `json:"pattern,omitempty"`
 	MinLength *uint64 `json:"minLength,omitempty"`
 	MaxLength *uint64 `json:"maxLength,omitempty"`
@@ -233,9 +253,9 @@ type ArrayRules struct {
 
 type ObjectItem struct {
 	ObjectRules
-	Properties       map[string]ObjectProperty `json:"properties,omitempty"`
-	Required         []string                  `json:"required,omitempty"`
-	ProtoMessageName string                    `json:"x-message"`
+	Properties       []*ObjectProperty `json:"properties,omitempty"`
+	Required         []string          `json:"required,omitempty"`
+	ProtoMessageName string            `json:"x-message"`
 	debug            string
 }
 
@@ -243,38 +263,50 @@ func (ri ObjectItem) TypeName() string {
 	return "object"
 }
 
-func (op ObjectItem) MarshalJSON() ([]byte, error) {
+func (op ObjectItem) GetProperty(name string) (*ObjectProperty, bool) {
+	for _, prop := range op.Properties {
+		if prop.ProtoFieldName == name {
+			return prop, true
+		}
+	}
+	return nil, false
+}
+
+func (op ObjectItem) jsonFieldMap(out map[string]json.RawMessage) error {
 	properties := map[string]json.RawMessage{}
 	required := []string{}
-	for name, prop := range op.Properties {
-		jsonVal, err := json.Marshal(prop)
-		if err != nil {
-			return nil, fmt.Errorf("property %s: %w", name, err)
+	for _, prop := range op.Properties {
+		if prop.Skip {
+			continue
 		}
-		properties[name] = jsonVal
+
+		jsonVal, err := prop.MarshalJSON()
+		if err != nil {
+			return fmt.Errorf("property %s: %w", prop.Name, err)
+		}
+		properties[prop.Name] = jsonVal
 
 		if prop.Required {
-			required = append(required, name)
+			required = append(required, prop.Name)
 		}
 	}
+	out["properties"], _ = json.Marshal(properties)
 
-	out := map[string]interface{}{
-		"type":       "object",
-		"properties": properties,
-		"x-debug":    op.debug,
-	}
 	if len(required) > 0 {
-		out["required"] = required
+		out["required"], _ = json.Marshal(required)
 	}
-
-	return json.Marshal(out)
+	return nil
 }
 
 type ObjectProperty struct {
 	SchemaItem
-	Required  bool `json:"-"` // this bubbles up to the required array of the object
-	ReadOnly  bool `json:"readOnly,omitempty"`
-	WriteOnly bool `json:"writeOnly,omitempty"`
+	Skip             bool   `json:"-"`
+	Name             string `json:"-"`
+	Required         bool   `json:"-"` // this bubbles up to the required array of the object
+	ReadOnly         bool   `json:"readOnly,omitempty"`
+	WriteOnly        bool   `json:"writeOnly,omitempty"`
+	ProtoFieldName   string `json:"x-proto-name,omitempty"`
+	ProtoFieldNumber int    `json:"x-proto-number,omitempty"`
 }
 
 type ObjectRules struct {
