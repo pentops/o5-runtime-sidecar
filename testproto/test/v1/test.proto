@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+option go_package = "github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb";
+
+import "google/api/annotations.proto";
+
+package test.v1;
+
+service FooService {
+  rpc GetFoo (GetFooRequest) returns (GetFooResponse) {
+    option (google.api.http) = {
+      get: "/test/v1/foo/{id}"
+    };
+  }
+
+  rpc PostFoo (PostFooRequest) returns (PostFooResponse) {
+    option (google.api.http) = {
+      post: "/test/v1/foo"
+      body: "*"
+    };
+  }
+}
+
+message GetFooRequest {
+  string id = 1;
+  int64 number = 2;
+  repeated float numbers = 3;
+}
+
+message GetFooResponse {
+  string id = 1;
+  string name = 2;
+  string field = 3;
+}
+
+message PostFooRequest {
+  string name = 1;
+  string field = 2;
+}
+
+message PostFooResponse {
+  string id = 1;
+  string name = 2;
+  string field = 3;
+}
+
+

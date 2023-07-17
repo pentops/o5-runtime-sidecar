@@ -2,10 +2,12 @@ package proxy
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -66,7 +68,7 @@ func (rr *Router) StaticJSON(path string, document interface{}) error {
 	return nil
 }
 
-func (rr *Router) RegisterService(ss protoreflect.ServiceDescriptor, conn *grpc.ClientConn) error {
+func (rr *Router) RegisterService(ss protoreflect.ServiceDescriptor, conn Invoker) error {
 	methods := ss.Methods()
 	name := string(ss.FullName())
 	for ii := 0; ii < methods.Len(); ii++ {
@@ -79,7 +81,15 @@ func (rr *Router) RegisterService(ss protoreflect.ServiceDescriptor, conn *grpc.
 }
 
 func (rr *Router) registerMethod(serviceName string, method protoreflect.MethodDescriptor, conn Invoker) error {
+	handler, err := rr.buildMethod(serviceName, method, conn)
+	if err != nil {
+		return err
+	}
+	rr.router.Methods(handler.HTTPMethod).Path(handler.HTTPPath).Handler(handler)
+	return nil
+}
 
+func (rr *Router) buildMethod(serviceName string, method protoreflect.MethodDescriptor, conn Invoker) (*Method, error) {
 	methodOptions := method.Options().(*descriptorpb.MethodOptions)
 	httpOpt := proto.GetExtension(methodOptions, annotations.E_Http).(*annotations.HttpRule)
 
@@ -104,7 +114,7 @@ func (rr *Router) registerMethod(serviceName string, method protoreflect.MethodD
 		httpPath = pt.Patch
 
 	default:
-		return fmt.Errorf("unsupported http method %T", pt)
+		return nil, fmt.Errorf("unsupported http method %T", pt)
 	}
 
 	handler := &Method{
@@ -119,8 +129,7 @@ func (rr *Router) registerMethod(serviceName string, method protoreflect.MethodD
 		ForwardRequestHeaders:  rr.ForwardRequestHeaders,
 	}
 
-	rr.router.Methods(httpMethod).Path(httpPath).Handler(handler)
-	return nil
+	return handler, nil
 
 }
 
@@ -135,24 +144,177 @@ type Method struct {
 	ForwardRequestHeaders  map[string]bool
 }
 
-func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func int32Mapper(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+	val, err := strconv.ParseInt(s, 10, 32)
+	if err != nil {
+		return protoreflect.Value{}, err
+	}
+	return protoreflect.ValueOfInt32(int32(val)), nil
+}
+
+func uint32Mapper(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+	val, err := strconv.ParseUint(s, 10, 32)
+	if err != nil {
+		return protoreflect.Value{}, err
+	}
+	return protoreflect.ValueOfUint32(uint32(val)), nil
+}
+
+func int64Mapper(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+	val, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return protoreflect.Value{}, err
+	}
+	return protoreflect.ValueOfInt64(val), nil
+}
+
+func uint64Mapper(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+	val, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return protoreflect.Value{}, err
+	}
+	return protoreflect.ValueOfUint64(val), nil
+}
+
+type mapperFromString func(protoreflect.FieldDescriptor, string) (protoreflect.Value, error)
+
+var mappersFromString = map[protoreflect.Kind]mapperFromString{
+	// Signed Int
+	protoreflect.Int32Kind: int32Mapper,
+	protoreflect.Int64Kind: int64Mapper,
+	// Insigned Int
+	protoreflect.Uint32Kind: uint32Mapper,
+	protoreflect.Uint64Kind: uint64Mapper,
+	// Signed Int - the other type but go doesn't care
+	protoreflect.Sint32Kind: int32Mapper,
+	protoreflect.Sint64Kind: int64Mapper,
+	// Signed Fixed uses the whole byte space, again the same in Go
+	protoreflect.Sfixed32Kind: int32Mapper,
+	protoreflect.Sfixed64Kind: int64Mapper,
+	// Unsigned Fixed uses the whole byte space, again the same in Go
+	protoreflect.Fixed32Kind: uint32Mapper,
+	protoreflect.Fixed64Kind: uint64Mapper,
+
+	protoreflect.StringKind: func(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+		return protoreflect.ValueOfString(s), nil
+	},
+	protoreflect.BoolKind: func(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+		return protoreflect.ValueOfBool(s == "true"), nil
+	},
+	protoreflect.FloatKind: func(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+		val, err := strconv.ParseFloat(s, 32)
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+		return protoreflect.ValueOfFloat32(float32(val)), nil
+	},
+	protoreflect.DoubleKind: func(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+		val, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+		return protoreflect.ValueOfFloat64(val), nil
+	},
+	protoreflect.BytesKind: func(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+		val, err := base64.StdEncoding.DecodeString(s)
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+		return protoreflect.ValueOfBytes(val), nil
+	},
+	protoreflect.EnumKind: func(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
+		enumValue := fd.Enum().Values().ByName(protoreflect.Name(s))
+		if enumValue == nil {
+			return protoreflect.Value{}, fmt.Errorf("invalid enum value %q for field %q", s, fd.Name())
+		}
+		return protoreflect.ValueOfEnum(enumValue.Number()), nil
+	},
+}
+
+func setFieldFromString(inputMessage *dynamicpb.Message, fd protoreflect.FieldDescriptor, provided string) error {
+	tc, ok := mappersFromString[fd.Kind()]
+	if !ok {
+		return fmt.Errorf("unsupported field type %s", fd.Kind())
+	}
+
+	val, err := tc(fd, provided)
+	if err != nil {
+		return err
+	}
+
+	inputMessage.Set(fd, val)
+	return nil
+}
+
+func setFieldFromStrings(inputMessage *dynamicpb.Message, fd protoreflect.FieldDescriptor, provided []string) error {
+
+	if !fd.IsList() {
+		if len(provided) > 1 {
+			return fmt.Errorf("multiple values provided for non-repeated field %q", fd.Name())
+		}
+		return setFieldFromString(inputMessage, fd, provided[0])
+	}
+
+	tc, ok := mappersFromString[fd.Kind()]
+	if !ok {
+		return fmt.Errorf("unsupported field type %s", fd.Kind())
+	}
+
+	field := inputMessage.NewField(fd)
+	list := field.List()
+
+	for _, s := range provided {
+		val, err := tc(fd, s)
+		if err != nil {
+			return err
+		}
+		list.Append(val)
+	}
+
+	inputMessage.Set(fd, field)
+
+	return nil
+}
+
+func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	inputMessage := dynamicpb.NewMessage(mm.Input)
-
-	// TODO: Map {dynamic} request parameters
-	// TODO: GET / no body
-
 	reqBody, err := io.ReadAll(r.Body)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		return nil, err
 	}
 
 	if len(reqBody) > 0 {
 		if err := protojson.Unmarshal(reqBody, inputMessage); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
+	}
+
+	reqVars := mux.Vars(r)
+	for key, provided := range reqVars {
+		fd := mm.Input.Fields().ByName(protoreflect.Name(key))
+		if err := setFieldFromString(inputMessage, fd, provided); err != nil {
+			return nil, err
+		}
+	}
+
+	query := r.URL.Query()
+	for key, values := range query {
+		fd := mm.Input.Fields().ByName(protoreflect.Name(key))
+		if err := setFieldFromStrings(inputMessage, fd, values); err != nil {
+			return nil, err
+		}
+	}
+
+	return inputMessage, nil
+}
+
+func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	inputMessage, err := mm.mapRequest(r)
+	if err != nil {
+		doUserError(ctx, w, err)
+		return
 	}
 
 	outputMessage := dynamicpb.NewMessage(mm.Output)
@@ -174,12 +336,7 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	err = mm.Invoker.Invoke(ctx, mm.FullName, inputMessage, outputMessage, grpc.Header(&responseHeader))
 	if err != nil {
-		// TODO: Handle specific gRPC trailer type errors
-		if statusError, isStatusError := status.FromError(err); isStatusError {
-			doStatusError(ctx, w, statusError)
-			return
-		}
-		doError(ctx, w, err)
+		doUserError(ctx, w, err)
 		return
 	}
 
@@ -207,6 +364,15 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.WithError(ctx, err).Error("Failed to write response")
 		return
 	}
+}
+
+func doUserError(ctx context.Context, w http.ResponseWriter, err error) {
+	// TODO: Handle specific gRPC trailer type errors
+	if statusError, isStatusError := status.FromError(err); isStatusError {
+		doStatusError(ctx, w, statusError)
+		return
+	}
+	doError(ctx, w, err)
 }
 
 func doError(ctx context.Context, w http.ResponseWriter, err error) {

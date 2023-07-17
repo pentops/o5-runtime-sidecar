@@ -136,7 +136,7 @@ func (bb *builder) registerMethod(serviceName string, method protoreflect.Method
 		})
 	}
 
-	if httpMethod == "get" {
+	if httpOpt.Body == "" {
 		// TODO: This should probably be based on the annotation setting of body
 		for _, param := range requestObject.Properties {
 			operation.Parameters = append(operation.Parameters, Parameter{
@@ -146,7 +146,7 @@ func (bb *builder) registerMethod(serviceName string, method protoreflect.Method
 				Schema:   param.SchemaItem,
 			})
 		}
-	} else {
+	} else if httpOpt.Body == "*" {
 		operation.RequestBody = &RequestBody{
 			Required: true,
 			Content: OperationContent{
@@ -155,6 +155,8 @@ func (bb *builder) registerMethod(serviceName string, method protoreflect.Method
 				},
 			},
 		}
+	} else {
+		return fmt.Errorf("unsupported body type %q", httpOpt.Body)
 	}
 
 	path, ok := bb.paths[httpPath]
