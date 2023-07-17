@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 type Document struct {
@@ -11,6 +12,12 @@ type Document struct {
 	Info       Info       `json:"info"`
 	Paths      PathSet    `json:"paths"`
 	Components Components `json:"components"`
+}
+
+func (dd *Document) GetSchema(name string) (*SchemaItem, bool) {
+	name = strings.TrimPrefix(name, "#/components/schemas/")
+	schema, ok := dd.Components.Schemas[name]
+	return schema, ok
 }
 
 type Info struct {
@@ -43,7 +50,7 @@ func (pi PathItem) MapKey() string {
 }
 
 type Components struct {
-	Schemas         map[string]SchemaItem  `json:"schemas"`
+	Schemas         map[string]*SchemaItem `json:"schemas"`
 	SecuritySchemes map[string]interface{} `json:"securitySchemes"`
 }
 
@@ -305,6 +312,7 @@ type ObjectProperty struct {
 	Required         bool   `json:"-"` // this bubbles up to the required array of the object
 	ReadOnly         bool   `json:"readOnly,omitempty"`
 	WriteOnly        bool   `json:"writeOnly,omitempty"`
+	Description      string `json:"description,omitempty"`
 	ProtoFieldName   string `json:"x-proto-name,omitempty"`
 	ProtoFieldNumber int    `json:"x-proto-number,omitempty"`
 }

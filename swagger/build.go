@@ -16,7 +16,7 @@ func Build(services []protoreflect.ServiceDescriptor) (*Document, error) {
 		document: &Document{
 			OpenAPI: "3.0.0",
 			Components: Components{
-				Schemas:         make(map[string]SchemaItem),
+				Schemas:         make(map[string]*SchemaItem),
 				SecuritySchemes: make(map[string]interface{}),
 			},
 		},
@@ -61,6 +61,9 @@ func (bb *builder) registerMethod(serviceName string, method protoreflect.Method
 	var httpMethod string
 	var httpPath string
 
+	if httpOpt == nil {
+		return fmt.Errorf("missing http rule for method %s", method.Name())
+	}
 	switch pt := httpOpt.Pattern.(type) {
 	case *annotations.HttpRule_Get:
 		httpMethod = "get"
@@ -90,7 +93,7 @@ func (bb *builder) registerMethod(serviceName string, method protoreflect.Method
 		},
 	}
 
-	okResponse, err := bb.buildSchemaObject(method.Output(), true)
+	okResponse, err := bb.buildSchemaObject(method.Output())
 	if err != nil {
 		return err
 	}
@@ -105,7 +108,7 @@ func (bb *builder) registerMethod(serviceName string, method protoreflect.Method
 		},
 	}}
 
-	request, err := bb.buildSchemaObject(method.Input(), true)
+	request, err := bb.buildSchemaObject(method.Input())
 	if err != nil {
 		return err
 	}
@@ -165,7 +168,7 @@ func (bb *builder) registerMethod(serviceName string, method protoreflect.Method
 	return nil
 }
 
-func (bb *builder) buildSchemaObject(src protoreflect.MessageDescriptor, topLevelMethodItem bool) (*SchemaItem, error) {
+func (bb *builder) buildSchemaObject(src protoreflect.MessageDescriptor) (*SchemaItem, error) {
 
 	obj := ObjectItem{
 		ProtoMessageName: string(src.FullName()),
@@ -174,25 +177,61 @@ func (bb *builder) buildSchemaObject(src protoreflect.MessageDescriptor, topLeve
 
 	for ii := 0; ii < src.Fields().Len(); ii++ {
 		field := src.Fields().Get(ii)
-		prop, err := bb.buildSchemaProperty(field, topLevelMethodItem)
+		prop, err := bb.buildSchemaProperty(field)
 		if err != nil {
 			return nil, err
 		}
 		obj.Properties = append(obj.Properties, prop)
 	}
 
+	description := commentDescription(src, string(src.Name()))
+
 	return &SchemaItem{
-		Description: string(src.Name()),
+		Description: description,
 		ItemType:    obj,
 	}, nil
 }
 
-func (bb *builder) buildSchemaProperty(src protoreflect.FieldDescriptor, topLevelMethodItem bool) (*ObjectProperty, error) {
+func commentDescription(src protoreflect.Descriptor, fallback string) string {
+	sourceLocation := src.ParentFile().SourceLocations().ByDescriptor(src)
+	return buildComment(sourceLocation, fallback)
+}
+
+func buildComment(sourceLocation protoreflect.SourceLocation, fallback string) string {
+	allComments := make([]string, 0)
+	if sourceLocation.LeadingComments != "" {
+		allComments = append(allComments, strings.Split(sourceLocation.LeadingComments, "\n")...)
+	}
+	if sourceLocation.TrailingComments != "" {
+		allComments = append(allComments, strings.Split(sourceLocation.TrailingComments, "\n")...)
+	}
+
+	// Trim leading whitespace
+	commentsOut := make([]string, 0, len(allComments))
+	for _, comment := range allComments {
+		comment = strings.TrimSpace(comment)
+		if comment == "" {
+			continue
+		}
+		if strings.HasPrefix(comment, "#") {
+			continue
+		}
+		commentsOut = append(commentsOut, comment)
+	}
+
+	if len(commentsOut) <= 0 {
+		return fallback
+	}
+	return strings.Join(commentsOut, "\n")
+}
+
+func (bb *builder) buildSchemaProperty(src protoreflect.FieldDescriptor) (*ObjectProperty, error) {
 
 	prop := &ObjectProperty{
 		ProtoFieldName:   string(src.Name()),
 		ProtoFieldNumber: int(src.Number()),
 		Name:             string(src.JSONName()),
+		Description:      commentDescription(src, ""),
 	}
 
 	// TODO: Validation / Rules
@@ -247,20 +286,12 @@ func (bb *builder) buildSchemaProperty(src protoreflect.FieldDescriptor, topLeve
 		}
 
 	case protoreflect.MessageKind:
-		if !topLevelMethodItem {
-			prop.SchemaItem = SchemaItem{
-				Ref: fmt.Sprintf("#/components/schemas/%s", src.Message().FullName()),
-			}
-			if err := bb.addSchemaRef(src.Message()); err != nil {
-				return nil, err
-			}
-
-		} else {
-			subItem, err := bb.buildSchemaObject(src.Message(), false) // Use ref for the next level
-			if err != nil {
-				return nil, err
-			}
-			prop.SchemaItem = *subItem
+		// When called from a field of a message, this creates a ref. When built directly from a service RPC request or create, this code is not called, they are inlined with the buildSchemaObject call directly
+		prop.SchemaItem = SchemaItem{
+			Ref: fmt.Sprintf("#/components/schemas/%s", src.Message().FullName()),
+		}
+		if err := bb.addSchemaRef(src.Message()); err != nil {
+			return nil, err
 		}
 
 	default:
@@ -284,12 +315,12 @@ func (bb *builder) addSchemaRef(src protoreflect.MessageDescriptor) error {
 		return nil
 	}
 
-	schema, err := bb.buildSchemaObject(src, false)
+	schema, err := bb.buildSchemaObject(src)
 	if err != nil {
 		return err
 	}
 
-	bb.document.Components.Schemas[string(src.FullName())] = *schema
+	bb.document.Components.Schemas[string(src.FullName())] = schema
 
 	return nil
 }
