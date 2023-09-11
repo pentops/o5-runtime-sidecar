@@ -225,8 +225,8 @@ func (ri IntegerItem) TypeName() string {
 }
 
 type IntegerRules struct {
-	ExclusiveMaximum Optional[int64] `json:"exclusiveMaximum,omitempty"`
-	ExclusiveMinimum Optional[int64] `json:"exclusiveMinimum,omitempty"`
+	ExclusiveMaximum Optional[bool]  `json:"exclusiveMaximum,omitempty"`
+	ExclusiveMinimum Optional[bool]  `json:"exclusiveMinimum,omitempty"`
 	Minimum          Optional[int64] `json:"minimum,omitempty"`
 	Maximum          Optional[int64] `json:"maximum,omitempty"`
 	MultipleOf       Optional[int64] `json:"multipleOf,omitempty"`
