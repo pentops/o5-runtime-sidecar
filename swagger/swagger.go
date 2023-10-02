@@ -146,11 +146,11 @@ func (si SchemaItem) MarshalJSON() ([]byte, error) {
 	}
 
 	if len(si.AnyOf) > 0 {
-		if len(si.AnyOf) > 0 || si.ItemType != nil {
+		if len(si.OneOf) > 0 || si.ItemType != nil {
 			return nil, fmt.Errorf("schema item has both a anyOf and other properties")
 		}
 		return json.Marshal(map[string]interface{}{
-			"oneOf": si.OneOf,
+			"anyOf": si.AnyOf,
 		})
 	}
 
@@ -208,8 +208,8 @@ func (ri NumberItem) TypeName() string {
 }
 
 type NumberRules struct {
-	ExclusiveMaximum Optional[float64] `json:"exclusiveMaximum,omitempty"`
-	ExclusiveMinimum Optional[float64] `json:"exclusiveMinimum,omitempty"`
+	ExclusiveMaximum Optional[bool]    `json:"exclusiveMaximum,omitempty"`
+	ExclusiveMinimum Optional[bool]    `json:"exclusiveMinimum,omitempty"`
 	Minimum          Optional[float64] `json:"minimum,omitempty"`
 	Maximum          Optional[float64] `json:"maximum,omitempty"`
 	MultipleOf       Optional[float64] `json:"multipleOf,omitempty"`
@@ -225,8 +225,8 @@ func (ri IntegerItem) TypeName() string {
 }
 
 type IntegerRules struct {
-	ExclusiveMaximum Optional[int64] `json:"exclusiveMaximum,omitempty"`
-	ExclusiveMinimum Optional[int64] `json:"exclusiveMinimum,omitempty"`
+	ExclusiveMaximum Optional[bool]  `json:"exclusiveMaximum,omitempty"`
+	ExclusiveMinimum Optional[bool]  `json:"exclusiveMinimum,omitempty"`
 	Minimum          Optional[int64] `json:"minimum,omitempty"`
 	Maximum          Optional[int64] `json:"maximum,omitempty"`
 	MultipleOf       Optional[int64] `json:"multipleOf,omitempty"`
