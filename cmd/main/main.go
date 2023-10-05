@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
@@ -25,7 +26,7 @@ var Version string
 
 var config = struct {
 	PublicPort  int    `env:"PUBLIC_PORT" default:"8080"`
-	Service     string `env:"SERVICE_ENDPOINT"`
+	Service     string `env:"SERVICE_ENDPOINT" default:""`
 	StaticFiles string `env:"STATIC_FILES" default:""`
 }{}
 
@@ -53,54 +54,66 @@ func run(ctx context.Context) error {
 	// TODO: Register a real one?
 	var s3Client s3iface.S3API
 
-	conn, err := grpc.DialContext(ctx, config.Service, grpc.WithInsecure(), grpc.WithConnectParams(grpc.ConnectParams{
-		Backoff: backoff.Config{
-			BaseDelay:  1 * time.Second,
-			Multiplier: 1.6,
-			MaxDelay:   120 * time.Second,
-			Jitter:     0.2,
-		},
-		MinConnectTimeout: 20 * time.Second,
-	}))
-	if err != nil {
-		return fmt.Errorf("dial: %w", err)
-	}
-	defer conn.Close()
-
-	services, err := protoread.FetchServices(ctx, conn)
-	if err != nil {
-		return fmt.Errorf("fetch: %w", err)
-	}
-
 	router := proxy.NewRouter()
 
 	if config.StaticFiles != "" {
 		router.SetNotFoundHandler(http.FileServer(http.Dir(config.StaticFiles)))
 	}
-	// TODO: CORS
-	// TODO: Auth
-	// TODO: Logging
-	// TODO: Metrics
-	// TODO: Custom forwarding headers
 
-	for _, ss := range services {
-		name := string(ss.FullName())
-		switch {
-		case strings.HasSuffix(name, "Service"):
-			if err := router.RegisterService(ss, conn); err != nil {
-				return err
+	allServices := make([]protoreflect.ServiceDescriptor, 0)
+
+	endpoints := strings.Split(config.Service, ",")
+	for _, endpoint := range endpoints {
+		endpoint = strings.TrimSpace(endpoint)
+		if endpoint == "" {
+			continue
+		}
+
+		conn, err := grpc.DialContext(ctx, config.Service, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff: backoff.Config{
+				BaseDelay:  1 * time.Second,
+				Multiplier: 1.6,
+				MaxDelay:   120 * time.Second,
+				Jitter:     0.2,
+			},
+			MinConnectTimeout: 20 * time.Second,
+		}))
+		if err != nil {
+			return fmt.Errorf("dial: %w", err)
+		}
+		defer conn.Close()
+
+		services, err := protoread.FetchServices(ctx, conn)
+		if err != nil {
+			return fmt.Errorf("fetch: %w", err)
+		}
+
+		// TODO: CORS
+		// TODO: Auth
+		// TODO: Logging
+		// TODO: Metrics
+		// TODO: Custom forwarding headers
+
+		for _, ss := range services {
+			allServices = append(allServices, ss)
+			name := string(ss.FullName())
+			switch {
+			case strings.HasSuffix(name, "Service"):
+				if err := router.RegisterService(ss, conn); err != nil {
+					return err
+				}
+			case strings.HasSuffix(name, "Topic"):
+				if err := registerTopic(ss, conn, s3Client); err != nil {
+					return err
+				}
+			default:
+				log.WithField(ctx, "service", name).Error("Unknown service type")
+				// but continue
 			}
-		case strings.HasSuffix(name, "Topic"):
-			if err := registerTopic(ss, conn, s3Client); err != nil {
-				return err
-			}
-		default:
-			log.WithField(ctx, "service", name).Error("Unknown service type")
-			// but continue
 		}
 	}
 
-	swaggerDocument, err := swagger.Build(services)
+	swaggerDocument, err := swagger.Build(allServices)
 	if err != nil {
 		return err
 	}
