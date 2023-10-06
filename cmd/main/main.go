@@ -13,22 +13,24 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/swagger"
 	"gopkg.daemonl.com/envconf"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
 	"gopkg.daemonl.com/log"
 )
 
 var Version string
 
-var config = struct {
+type EnvConfig struct {
 	PublicPort  int    `env:"PUBLIC_PORT" default:"8080"`
 	Service     string `env:"SERVICE_ENDPOINT" default:""`
 	StaticFiles string `env:"STATIC_FILES" default:""`
-}{}
+}
 
 func main() {
 
@@ -38,38 +40,44 @@ func main() {
 		"version":     Version,
 	})
 
-	if err := envconf.Parse(&config); err != nil {
+	cfg := EnvConfig{}
+
+	if err := envconf.Parse(&cfg); err != nil {
 		log.WithError(ctx, err).Error("Config Failure")
 		os.Exit(1)
 	}
 
-	if err := run(ctx); err != nil {
+	if err := run(ctx, cfg); err != nil {
 		log.WithError(ctx, err).Error("Failed to serve")
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context) error {
+func run(ctx context.Context, envConfig EnvConfig) error {
 
-	// TODO: Register a real one?
-	var s3Client s3iface.S3API
+	awsConfig, err := config.LoadDefaultConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to load configuration: %w", err)
+	}
+
+	sqsClient := sqs.NewFromConfig(awsConfig)
 
 	router := proxy.NewRouter()
 
-	if config.StaticFiles != "" {
-		router.SetNotFoundHandler(http.FileServer(http.Dir(config.StaticFiles)))
+	if envConfig.StaticFiles != "" {
+		router.SetNotFoundHandler(http.FileServer(http.Dir(envConfig.StaticFiles)))
 	}
 
 	allServices := make([]protoreflect.ServiceDescriptor, 0)
 
-	endpoints := strings.Split(config.Service, ",")
+	endpoints := strings.Split(envConfig.Service, ",")
 	for _, endpoint := range endpoints {
 		endpoint = strings.TrimSpace(endpoint)
 		if endpoint == "" {
 			continue
 		}
 
-		conn, err := grpc.DialContext(ctx, config.Service, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithConnectParams(grpc.ConnectParams{
+		conn, err := grpc.DialContext(ctx, envConfig.Service, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithConnectParams(grpc.ConnectParams{
 			Backoff: backoff.Config{
 				BaseDelay:  1 * time.Second,
 				Multiplier: 1.6,
@@ -103,7 +111,7 @@ func run(ctx context.Context) error {
 					return err
 				}
 			case strings.HasSuffix(name, "Topic"):
-				if err := registerTopic(ss, conn, s3Client); err != nil {
+				if err := registerTopic(ss, conn, sqsClient); err != nil {
 					return err
 				}
 			default:
@@ -124,12 +132,15 @@ func run(ctx context.Context) error {
 
 	srv := http.Server{
 		Handler: router,
-		Addr:    fmt.Sprintf(":%d", config.PublicPort),
+		Addr:    fmt.Sprintf(":%d", envConfig.PublicPort),
 	}
 
 	return srv.ListenAndServe()
 }
 
-func registerTopic(ss protoreflect.ServiceDescriptor, conn proxy.Invoker, s3Client s3iface.S3API) error {
+type SQSAPI interface {
+}
+
+func registerTopic(ss protoreflect.ServiceDescriptor, conn proxy.Invoker, sqsClient SQSAPI) error {
 	return nil
 }
