@@ -29,7 +29,7 @@ import (
 var Version string
 
 type EnvConfig struct {
-	PublicPort  int    `env:"PUBLIC_PORT"`
+	PublicPort  int    `env:"PUBLIC_PORT" default:""`
 	Service     string `env:"SERVICE_ENDPOINT" default:""`
 	StaticFiles string `env:"STATIC_FILES" default:""`
 	SQSURL      string `env:"SQS_URL" default:""`
