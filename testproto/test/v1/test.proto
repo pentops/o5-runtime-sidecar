@@ -3,6 +3,7 @@ syntax = "proto3";
 option go_package = "github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb";
 
 import "google/api/annotations.proto";
+import "google/protobuf/empty.proto";
 
 package test.v1;
 
@@ -44,4 +45,14 @@ message PostFooResponse {
   string field = 3;
 }
 
+
+service FooTopic {
+  rpc Foo(FooMessage) returns (google.protobuf.Empty) {}
+}
+
+message FooMessage {
+  string id = 1;
+  string name = 2;
+  string field = 3;
+}
 

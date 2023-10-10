@@ -69,18 +69,17 @@ func (rr *Router) StaticJSON(path string, document interface{}) error {
 
 func (rr *Router) RegisterService(ss protoreflect.ServiceDescriptor, conn Invoker) error {
 	methods := ss.Methods()
-	name := string(ss.FullName())
 	for ii := 0; ii < methods.Len(); ii++ {
 		method := methods.Get(ii)
-		if err := rr.registerMethod(name, method, conn); err != nil {
+		if err := rr.registerMethod(method, conn); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (rr *Router) registerMethod(serviceName string, method protoreflect.MethodDescriptor, conn Invoker) error {
-	handler, err := rr.buildMethod(serviceName, method, conn)
+func (rr *Router) registerMethod(method protoreflect.MethodDescriptor, conn Invoker) error {
+	handler, err := rr.buildMethod(method, conn)
 	if err != nil {
 		return err
 	}
@@ -88,7 +87,8 @@ func (rr *Router) registerMethod(serviceName string, method protoreflect.MethodD
 	return nil
 }
 
-func (rr *Router) buildMethod(serviceName string, method protoreflect.MethodDescriptor, conn Invoker) (*Method, error) {
+func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker) (*Method, error) {
+	serviceName := method.Parent().(protoreflect.ServiceDescriptor).FullName()
 	methodOptions := method.Options().(*descriptorpb.MethodOptions)
 	httpOpt := proto.GetExtension(methodOptions, annotations.E_Http).(*annotations.HttpRule)
 

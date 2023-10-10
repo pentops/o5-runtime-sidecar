@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
+	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/pentops/o5-runtime-sidecar/swagger"
 	"gopkg.daemonl.com/envconf"
 
@@ -27,9 +29,10 @@ import (
 var Version string
 
 type EnvConfig struct {
-	PublicPort  int    `env:"PUBLIC_PORT" default:"8080"`
+	PublicPort  int    `env:"PUBLIC_PORT"`
 	Service     string `env:"SERVICE_ENDPOINT" default:""`
 	StaticFiles string `env:"STATIC_FILES" default:""`
+	SQSURL      string `env:"SQS_URL" default:""`
 }
 
 func main() {
@@ -60,11 +63,22 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	sqsClient := sqs.NewFromConfig(awsConfig)
+	var worker *sqslink.Worker
+	if envConfig.SQSURL != "" {
+		sqsClient := sqs.NewFromConfig(awsConfig)
+		worker = sqslink.NewWorker(sqsClient, envConfig.SQSURL)
+	}
 
-	router := proxy.NewRouter()
+	var router *proxy.Router
+	if envConfig.PublicPort != 0 {
+		router = proxy.NewRouter()
+	}
 
 	if envConfig.StaticFiles != "" {
+		if router == nil {
+			return fmt.Errorf("static files configured but no public port")
+		}
+
 		router.SetNotFoundHandler(http.FileServer(http.Dir(envConfig.StaticFiles)))
 	}
 
@@ -107,11 +121,17 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 			name := string(ss.FullName())
 			switch {
 			case strings.HasSuffix(name, "Service"):
+				if router == nil {
+					return fmt.Errorf("service %s requires a public port", name)
+				}
 				if err := router.RegisterService(ss, conn); err != nil {
 					return err
 				}
 			case strings.HasSuffix(name, "Topic"):
-				if err := registerTopic(ss, conn, sqsClient); err != nil {
+				if worker == nil {
+					return fmt.Errorf("topic %s requires an SQS URL", name)
+				}
+				if err := worker.RegisterService(ss, conn); err != nil {
 					return err
 				}
 			default:
@@ -121,26 +141,43 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		}
 	}
 
-	swaggerDocument, err := swagger.Build(allServices)
-	if err != nil {
-		return err
+	if router == nil && worker == nil {
+		return fmt.Errorf("no router and no worker. Nothing to do")
 	}
 
-	if err := router.StaticJSON("/swagger.json", swaggerDocument); err != nil {
-		return err
+	eg, ctx := errgroup.WithContext(ctx)
+
+	if router != nil {
+		swaggerDocument, err := swagger.Build(allServices)
+		if err != nil {
+			return err
+		}
+
+		if err := router.StaticJSON("/swagger.json", swaggerDocument); err != nil {
+			return err
+		}
+
+		srv := http.Server{
+			Handler: router,
+			Addr:    fmt.Sprintf(":%d", envConfig.PublicPort),
+		}
+
+		go func() {
+			<-ctx.Done()
+			srv.Shutdown(ctx)
+		}()
+
+		eg.Go(func() error {
+			return srv.ListenAndServe()
+		})
 	}
 
-	srv := http.Server{
-		Handler: router,
-		Addr:    fmt.Sprintf(":%d", envConfig.PublicPort),
+	if worker != nil {
+		eg.Go(func() error {
+			return worker.Run(ctx)
+		})
 	}
 
-	return srv.ListenAndServe()
-}
+	return eg.Wait()
 
-type SQSAPI interface {
-}
-
-func registerTopic(ss protoreflect.ServiceDescriptor, conn proxy.Invoker, sqsClient SQSAPI) error {
-	return nil
 }

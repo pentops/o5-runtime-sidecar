@@ -22,7 +22,7 @@ func TestGetHandlerMapping(t *testing.T) {
 	fd := testpb.File_test_v1_test_proto.Services().Get(0).Methods().Get(0)
 
 	rr := NewRouter()
-	method, err := rr.buildMethod("foobar", fd, nil)
+	method, err := rr.buildMethod(fd, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestBodyHandlerMapping(t *testing.T) {
 	fd := testpb.File_test_v1_test_proto.Services().Get(0).Methods().Get(1)
 
 	rr := NewRouter()
-	method, err := rr.buildMethod("foobar", fd, nil)
+	method, err := rr.buildMethod(fd, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
