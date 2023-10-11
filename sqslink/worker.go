@@ -109,6 +109,16 @@ func (ww *Worker) Run(ctx context.Context) error {
 			// The duration (in seconds) that the received messages are hidden from subsequent
 			// retrieve requests after being retrieved by a ReceiveMessage request.
 			VisibilityTimeout: 30,
+
+			MessageAttributeNames: []string{
+				contentTypeAttribute,
+				serviceAttribute,
+			},
+
+			AttributeNames: []types.QueueAttributeName{
+				// this type conversion is probably a bug in the SDK
+				types.QueueAttributeName(types.MessageSystemAttributeNameApproximateReceiveCount),
+			},
 		})
 		if err != nil {
 			return err
