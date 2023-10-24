@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/pentops/o5-runtime-sidecar/ourprotojson"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -151,7 +152,7 @@ func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	}
 
 	if len(reqBody) > 0 {
-		if err := protojson.Unmarshal(reqBody, inputMessage); err != nil {
+		if err := unmarshalJSON(reqBody, inputMessage); err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 	}
@@ -173,6 +174,10 @@ func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	}
 
 	return inputMessage, nil
+}
+
+func unmarshalJSON(data []byte, msg protoreflect.Message) error {
+	return ourprotojson.Decode(data, msg)
 }
 
 func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {

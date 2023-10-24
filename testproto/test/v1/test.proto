@@ -37,6 +37,20 @@ message GetFooResponse {
 message PostFooRequest {
   string name = 1;
   string field = 2;
+  Bar bar = 3;
+  repeated string baz = 4;
+  repeated Bar bars = 5;
+
+  oneof theoneof {
+    string onestring = 10;
+    Bar onebar = 11;
+  }
+}
+
+message Bar {
+  string id = 1;
+  string name = 2;
+  string field = 3;
 }
 
 message PostFooResponse {
