@@ -1,53 +1,127 @@
 package ourprotojson
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-func (dec *decoder) decodeScalarField(kind protoreflect.Kind) (protoreflect.Value, error) {
-
-	switch kind {
-	/*
-		case protoreflect.BoolKind:
-			return decodeBoolField(dec, msg, field)
-	*/
-	case protoreflect.StringKind:
-		return dec.decodeStringField()
-		/*
-			case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
-				return decodeInt32Field(dec, msg, field)
-			case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
-				return decodeInt64Field(dec, msg, field)
-			case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
-				return decodeUint32Field(dec, msg, field)
-			case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
-				return decodeUint64Field(dec, msg, field)
-			case protoreflect.FloatKind:
-				return decodeFloat32Field(dec, msg, field)
-			case protoreflect.DoubleKind:
-				return decodeFloat64Field(dec, msg, field)
-			case protoreflect.BytesKind:
-				return decodeBytesField(dec, msg, field)
-			case protoreflect.EnumKind:
-				return decodeEnumField(dec, msg, field)
-		*/
-	default:
-		return protoreflect.Value{}, fmt.Errorf("unsupported field kind %v", kind)
-	}
-}
-
-func (dec *decoder) decodeStringField() (protoreflect.Value, error) {
+func (dec *decoder) decodeScalarField(field protoreflect.FieldDescriptor) (protoreflect.Value, error) {
 	tok, err := dec.Token()
 	if err != nil {
 		return protoreflect.Value{}, err
 	}
 
-	str, ok := tok.(string)
-	if !ok {
-		return protoreflect.Value{}, fmt.Errorf("expected string but got %v", tok)
-	}
+	switch field.Kind() {
+	case protoreflect.StringKind:
+		str, ok := tok.(string)
+		if !ok {
+			return protoreflect.Value{}, fmt.Errorf("expected string but got %v", tok)
+		}
+		return protoreflect.ValueOfString(str), nil
 
-	return protoreflect.ValueOfString(str), nil
+	case protoreflect.Int32Kind, protoreflect.Sint32Kind, protoreflect.Sfixed32Kind:
+		i, ok := tok.(json.Number)
+		if !ok {
+			return protoreflect.Value{}, fmt.Errorf("expected int32 but got %v", tok)
+		}
+		intVal, err := i.Int64()
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+
+		return protoreflect.ValueOfInt32(int32(intVal)), nil
+
+	case protoreflect.Int64Kind, protoreflect.Sint64Kind, protoreflect.Sfixed64Kind:
+		i, ok := tok.(json.Number)
+		if !ok {
+			return protoreflect.Value{}, fmt.Errorf("expected int64 but got %v", tok)
+		}
+		intVal, err := i.Int64()
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+
+		return protoreflect.ValueOfInt64(int64(intVal)), nil
+
+	case protoreflect.Uint32Kind, protoreflect.Fixed32Kind:
+		i, ok := tok.(json.Number)
+		if !ok {
+			return protoreflect.Value{}, fmt.Errorf("expected uint32 but got %v", tok)
+		}
+		intVal, err := i.Int64()
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+
+		return protoreflect.ValueOfUint32(uint32(intVal)), nil
+
+	case protoreflect.Uint64Kind, protoreflect.Fixed64Kind:
+		i, ok := tok.(json.Number)
+		if !ok {
+			return protoreflect.Value{}, fmt.Errorf("expected uint64 but got %v", tok)
+		}
+		intVal, err := i.Int64()
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+
+		return protoreflect.ValueOfUint64(uint64(intVal)), nil
+
+	case protoreflect.FloatKind:
+		f, ok := tok.(json.Number)
+		if !ok {
+			return protoreflect.Value{}, fmt.Errorf("expected float but got %v", tok)
+		}
+		floatVal, err := f.Float64()
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+
+		return protoreflect.ValueOfFloat32(float32(floatVal)), nil
+
+	case protoreflect.DoubleKind:
+		f, ok := tok.(json.Number)
+		if !ok {
+			return protoreflect.Value{}, fmt.Errorf("expected double but got %v", tok)
+		}
+		floatVal, err := f.Float64()
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+
+		return protoreflect.ValueOfFloat64(floatVal), nil
+
+	case protoreflect.EnumKind:
+		stringVal, ok := tok.(string)
+		if !ok {
+			return protoreflect.Value{}, unexpectedTokenError(tok, "string")
+		}
+		enumValue, err := decodeEnumField(stringVal, field)
+		if err != nil {
+			return protoreflect.Value{}, err
+		}
+
+		return protoreflect.ValueOfEnum(enumValue), nil
+
+	default:
+		return protoreflect.Value{}, fmt.Errorf("unsupported field kind %v", field.Kind())
+	}
+}
+
+func decodeEnumField(stringVal string, field protoreflect.FieldDescriptor) (protoreflect.EnumNumber, error) {
+
+	enum := field.Enum()
+	vals := enum.Values()
+	unspecified := vals.ByNumber(0)
+	if unspecified != nil && strings.HasSuffix(stringVal, "_UNSPECIFIED") {
+		prefix := strings.TrimSuffix(stringVal, "_UNSPECIFIED")
+		if !strings.HasPrefix(stringVal, prefix) {
+			stringVal = prefix + stringVal
+		}
+	}
+	enumVal := vals.ByName(protoreflect.Name(stringVal)).Number()
+	return enumVal, nil
 }

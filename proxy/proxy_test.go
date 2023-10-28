@@ -78,13 +78,13 @@ func TestBodyHandlerMapping(t *testing.T) {
 	assert.Equal(t, "POST", method.HTTPMethod)
 
 	t.Run("Basic", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/test/v1/foo", strings.NewReader(`{"name":"nameVal"}`))
+		req := httptest.NewRequest("POST", "/test/v1/foo", strings.NewReader(`{"sString":"nameVal"}`))
 		reqToService := &testpb.PostFooRequest{}
 		rw := roundTrip(method, req, reqToService, &testpb.PostFooResponse{})
 		if rw.Code != 200 {
 			t.Fatalf("expected status code 200, got %d", rw.Code)
 		}
-		assert.Equal(t, "nameVal", reqToService.Name)
+		assert.Equal(t, "nameVal", reqToService.SString)
 	})
 
 	t.Run("BadJSON", func(t *testing.T) {

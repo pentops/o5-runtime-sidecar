@@ -266,11 +266,6 @@ func doError(ctx context.Context, w http.ResponseWriter, err error) {
 }
 
 func doStatusError(ctx context.Context, w http.ResponseWriter, statusError *status.Status) {
-	log.WithError(ctx, statusError.Err()).Error("Error handling request")
-	body := map[string]string{
-		"error": statusError.Message(),
-	}
-	bytesOut, err := json.Marshal(body)
 	if err != nil {
 		log.WithError(ctx, err).Error("Failed to marshal error response")
 		http.Error(w, `{"error":"meta error marshalling error"}`, http.StatusInternalServerError)
