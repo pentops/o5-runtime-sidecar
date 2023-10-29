@@ -53,6 +53,11 @@ message PostFooRequest {
   Enum enum = 11;
   repeated Enum r_enum = 12;
 
+  bytes s_bytes = 13;
+  repeated bytes r_bytes = 14;
+
+  map<string, string> map_string_string = 15;
+
   oneof naked_oneof {
     string oneof_string = 100;
     Bar one_bar = 101;

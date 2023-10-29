@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/pentops/o5-runtime-sidecar/ourprotojson"
+	"github.com/pentops/custom-proto-api/jsonapi"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -142,6 +142,7 @@ type Method struct {
 	HTTPPath               string
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
+	CodecOptions           jsonapi.Options
 }
 
 func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
@@ -152,7 +153,7 @@ func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	}
 
 	if len(reqBody) > 0 {
-		if err := unmarshalJSON(reqBody, inputMessage); err != nil {
+		if err := jsonapi.Decode(mm.CodecOptions, reqBody, inputMessage); err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 	}
@@ -174,10 +175,6 @@ func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	}
 
 	return inputMessage, nil
-}
-
-func unmarshalJSON(data []byte, msg protoreflect.Message) error {
-	return ourprotojson.Decode(data, msg)
 }
 
 func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -266,6 +263,10 @@ func doError(ctx context.Context, w http.ResponseWriter, err error) {
 }
 
 func doStatusError(ctx context.Context, w http.ResponseWriter, statusError *status.Status) {
+	bytesOut, err := json.Marshal(map[string]string{
+		"error": statusError.Message(),
+	})
+
 	if err != nil {
 		log.WithError(ctx, err).Error("Failed to marshal error response")
 		http.Error(w, `{"error":"meta error marshalling error"}`, http.StatusInternalServerError)

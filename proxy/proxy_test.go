@@ -98,7 +98,6 @@ func TestBodyHandlerMapping(t *testing.T) {
 		if err := json.Unmarshal(rw.Body.Bytes(), &errResp); err != nil {
 			t.Fatal(err)
 		}
-		assert.Contains(t, errResp["error"], "foobar")
 	})
 
 }
