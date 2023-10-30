@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -31,6 +30,7 @@ type Router struct {
 	router                 *mux.Router
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
+	CodecOptions           jsonapi.Options
 }
 
 func NewRouter() *Router {
@@ -43,6 +43,13 @@ func NewRouter() *Router {
 		ForwardRequestHeaders: map[string]bool{
 			"cookie": true,
 			"origin": true,
+		},
+		CodecOptions: jsonapi.Options{
+			ShortEnums: &jsonapi.ShortEnumsOption{
+				UnspecifiedSuffix: "UNSPECIFIED",
+				StrictUnmarshal:   true,
+			},
+			WrapOneof: true,
 		},
 	}
 }
@@ -127,6 +134,7 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 		HTTPPath:               httpPath,
 		ForwardResponseHeaders: rr.ForwardResponseHeaders,
 		ForwardRequestHeaders:  rr.ForwardRequestHeaders,
+		CodecOptions:           rr.CodecOptions,
 	}
 
 	return handler, nil
@@ -209,7 +217,7 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytesOut, err := protojson.Marshal(outputMessage)
+	bytesOut, err := jsonapi.Encode(mm.CodecOptions, outputMessage)
 	if err != nil {
 		doError(ctx, w, err)
 		return
