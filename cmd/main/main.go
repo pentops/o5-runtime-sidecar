@@ -6,22 +6,21 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
-	"github.com/pentops/custom-proto-api/jsonapi"
 	"github.com/pentops/custom-proto-api/swagger"
+	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"gopkg.daemonl.com/envconf"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
 	"gopkg.daemonl.com/log"
@@ -34,6 +33,9 @@ type EnvConfig struct {
 	Service     string `env:"SERVICE_ENDPOINT" default:""`
 	StaticFiles string `env:"STATIC_FILES" default:""`
 	SQSURL      string `env:"SQS_URL" default:""`
+
+	PostgresOutboxURI string `env:"POSTGRES_OUTBOX" default:""`
+	SNSPrefix         string `env:"SNS_PREFIX" default:""`
 }
 
 func main() {
@@ -83,14 +85,6 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		router.SetNotFoundHandler(http.FileServer(http.Dir(envConfig.StaticFiles)))
 	}
 
-	codecOptions := jsonapi.Options{
-		ShortEnums: &jsonapi.ShortEnumsOption{
-			UnspecifiedSuffix: "UNSPECIFIED",
-			StrictUnmarshal:   true,
-		},
-		WrapOneof: true,
-	}
-
 	allServices := make([]protoreflect.ServiceDescriptor, 0)
 
 	endpoints := strings.Split(envConfig.Service, ",")
@@ -100,15 +94,7 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 			continue
 		}
 
-		conn, err := grpc.DialContext(ctx, envConfig.Service, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithConnectParams(grpc.ConnectParams{
-			Backoff: backoff.Config{
-				BaseDelay:  1 * time.Second,
-				Multiplier: 1.6,
-				MaxDelay:   120 * time.Second,
-				Jitter:     0.2,
-			},
-			MinConnectTimeout: 20 * time.Second,
-		}))
+		conn, err := grpc.DialContext(ctx, envConfig.Service, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			return fmt.Errorf("dial: %w", err)
 		}
@@ -150,14 +136,14 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		}
 	}
 
-	if router == nil && worker == nil {
+	if router == nil && worker == nil && envConfig.PostgresOutboxURI == "" {
 		return fmt.Errorf("no router and no worker. Nothing to do")
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 
 	if router != nil {
-		swaggerDocument, err := swagger.Build(codecOptions, allServices)
+		swaggerDocument, err := swagger.Build(router.CodecOptions, allServices)
 		if err != nil {
 			return err
 		}
@@ -173,7 +159,7 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 
 		go func() {
 			<-ctx.Done()
-			srv.Shutdown(ctx)
+			srv.Shutdown(ctx) // nolint:errcheck
 		}()
 
 		eg.Go(func() error {
@@ -184,6 +170,14 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 	if worker != nil {
 		eg.Go(func() error {
 			return worker.Run(ctx)
+		})
+	}
+
+	if envConfig.PostgresOutboxURI != "" {
+		snsClient := sns.NewFromConfig(awsConfig)
+		sender := outbox.NewSNSBatcher(snsClient, envConfig.SNSPrefix)
+		eg.Go(func() error {
+			return outbox.Listen(ctx, envConfig.PostgresOutboxURI, sender)
 		})
 	}
 
