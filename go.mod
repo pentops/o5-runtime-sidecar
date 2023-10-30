@@ -8,13 +8,13 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sns v1.23.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.24.5
 	github.com/elgris/sqrl v0.0.0-20190909141434-5a439265eeec
+	github.com/google/uuid v1.3.1
 	github.com/gorilla/mux v1.8.0
 	github.com/lib/pq v1.10.9
 	github.com/pentops/custom-proto-api v0.0.0-20231029225438-2e625f1f4883
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/crypto v0.14.0
 	golang.org/x/sync v0.4.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b
 	google.golang.org/grpc v1.59.0
@@ -41,6 +41,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb // indirect
 	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect

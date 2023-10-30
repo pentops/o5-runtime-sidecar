@@ -22,6 +22,11 @@ import (
 	"gopkg.daemonl.com/log"
 )
 
+// AuthFunc translates a request into headers to pass on to the remote server
+// Errors which implement gRPC status will be returned to the client as HTTP
+// errors, otherwise 500 with a log line
+type AuthFunc func(context.Context, *http.Request) (map[string]string, error)
+
 type Invoker interface {
 	Invoke(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
 }
@@ -159,8 +164,6 @@ type Method struct {
 	CodecOptions           jsonapi.Options
 	authFunc               AuthFunc
 }
-
-type AuthFunc func(context.Context, *http.Request) (map[string]string, error)
 
 func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	inputMessage := dynamicpb.NewMessage(mm.Input)
