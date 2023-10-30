@@ -31,6 +31,8 @@ type Router struct {
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
 	CodecOptions           jsonapi.Options
+
+	AuthFunc AuthFunc
 }
 
 func NewRouter() *Router {
@@ -135,6 +137,10 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 		ForwardResponseHeaders: rr.ForwardResponseHeaders,
 		ForwardRequestHeaders:  rr.ForwardRequestHeaders,
 		CodecOptions:           rr.CodecOptions,
+
+		// TODO: Customize this based on reflection parameters, e.g. scopes,
+		// tenant ID etc
+		authFunc: rr.AuthFunc,
 	}
 
 	return handler, nil
@@ -151,7 +157,10 @@ type Method struct {
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
 	CodecOptions           jsonapi.Options
+	authFunc               AuthFunc
 }
+
+type AuthFunc func(context.Context, *http.Request) (map[string]string, error)
 
 func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	inputMessage := dynamicpb.NewMessage(mm.Input)
@@ -203,6 +212,17 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		md[key] = v[0] // only one value in gRPC
+	}
+
+	if mm.authFunc != nil {
+		authHeaders, err := mm.authFunc(ctx, r)
+		if err != nil {
+			doUserError(ctx, w, err)
+			return
+		}
+		for key, val := range authHeaders {
+			md[key] = val
+		}
 	}
 
 	// Send request header
