@@ -4,6 +4,7 @@ option go_package = "github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb"
 
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 
 package test.v1;
 
@@ -35,8 +36,46 @@ message GetFooResponse {
 }
 
 message PostFooRequest {
-  string name = 1;
-  string field = 2;
+  string s_string = 1;
+  optional string o_string = 2;
+  repeated string r_string = 3;
+
+  float s_float = 4;
+  optional float o_float = 5;
+  repeated float r_float = 6;
+
+  google.protobuf.Timestamp ts = 7;
+  repeated google.protobuf.Timestamp r_ts = 8;
+
+  Bar s_bar = 9;
+  repeated Bar r_bars = 10;
+
+  Enum enum = 11;
+  repeated Enum r_enum = 12;
+
+  bytes s_bytes = 13;
+  repeated bytes r_bytes = 14;
+
+  map<string, string> map_string_string = 15;
+
+  oneof naked_oneof {
+    string oneof_string = 100;
+    Bar one_bar = 101;
+    float oneof_float = 102;
+    Enum oneof_enum = 103;
+  }
+}
+
+enum Enum {
+  ENUM_UNSPECIFIED = 0;
+  ENUM_VALUE1 = 1;
+  ENUM_VALUE2 = 2;
+}
+
+message Bar {
+  string id = 1;
+  string name = 2;
+  string field = 3;
 }
 
 message PostFooResponse {

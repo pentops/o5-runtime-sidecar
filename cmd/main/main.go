@@ -14,10 +14,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/pentops/custom-proto-api/jsonapi"
+	"github.com/pentops/custom-proto-api/swagger"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
-	"github.com/pentops/o5-runtime-sidecar/swagger"
 	"gopkg.daemonl.com/envconf"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -80,6 +81,14 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		}
 
 		router.SetNotFoundHandler(http.FileServer(http.Dir(envConfig.StaticFiles)))
+	}
+
+	codecOptions := jsonapi.Options{
+		ShortEnums: &jsonapi.ShortEnumsOption{
+			UnspecifiedSuffix: "UNSPECIFIED",
+			StrictUnmarshal:   true,
+		},
+		WrapOneof: true,
 	}
 
 	allServices := make([]protoreflect.ServiceDescriptor, 0)
@@ -148,7 +157,7 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	if router != nil {
-		swaggerDocument, err := swagger.Build(allServices)
+		swaggerDocument, err := swagger.Build(codecOptions, allServices)
 		if err != nil {
 			return err
 		}

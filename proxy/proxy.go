@@ -9,12 +9,12 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/pentops/custom-proto-api/jsonapi"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -30,6 +30,7 @@ type Router struct {
 	router                 *mux.Router
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
+	CodecOptions           jsonapi.Options
 }
 
 func NewRouter() *Router {
@@ -42,6 +43,13 @@ func NewRouter() *Router {
 		ForwardRequestHeaders: map[string]bool{
 			"cookie": true,
 			"origin": true,
+		},
+		CodecOptions: jsonapi.Options{
+			ShortEnums: &jsonapi.ShortEnumsOption{
+				UnspecifiedSuffix: "UNSPECIFIED",
+				StrictUnmarshal:   true,
+			},
+			WrapOneof: true,
 		},
 	}
 }
@@ -126,6 +134,7 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 		HTTPPath:               httpPath,
 		ForwardResponseHeaders: rr.ForwardResponseHeaders,
 		ForwardRequestHeaders:  rr.ForwardRequestHeaders,
+		CodecOptions:           rr.CodecOptions,
 	}
 
 	return handler, nil
@@ -141,6 +150,7 @@ type Method struct {
 	HTTPPath               string
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
+	CodecOptions           jsonapi.Options
 }
 
 func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
@@ -151,7 +161,7 @@ func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	}
 
 	if len(reqBody) > 0 {
-		if err := protojson.Unmarshal(reqBody, inputMessage); err != nil {
+		if err := jsonapi.Decode(mm.CodecOptions, reqBody, inputMessage); err != nil {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
 	}
@@ -207,7 +217,7 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bytesOut, err := protojson.Marshal(outputMessage)
+	bytesOut, err := jsonapi.Encode(mm.CodecOptions, outputMessage)
 	if err != nil {
 		doError(ctx, w, err)
 		return
@@ -261,11 +271,10 @@ func doError(ctx context.Context, w http.ResponseWriter, err error) {
 }
 
 func doStatusError(ctx context.Context, w http.ResponseWriter, statusError *status.Status) {
-	log.WithError(ctx, statusError.Err()).Error("Error handling request")
-	body := map[string]string{
+	bytesOut, err := json.Marshal(map[string]string{
 		"error": statusError.Message(),
-	}
-	bytesOut, err := json.Marshal(body)
+	})
+
 	if err != nil {
 		log.WithError(ctx, err).Error("Failed to marshal error response")
 		http.Error(w, `{"error":"meta error marshalling error"}`, http.StatusInternalServerError)
