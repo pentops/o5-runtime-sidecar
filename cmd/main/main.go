@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/pentops/custom-proto-api/swagger"
+	"github.com/pentops/o5-runtime-sidecar/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
@@ -23,7 +24,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
-	"gopkg.daemonl.com/log"
+	"github.com/pentops/log.go/log"
 )
 
 var Version string
@@ -36,6 +37,8 @@ type EnvConfig struct {
 
 	PostgresOutboxURI string `env:"POSTGRES_OUTBOX" default:""`
 	SNSPrefix         string `env:"SNS_PREFIX" default:""`
+
+	JWKS []string `env:"JWKS" default:""`
 }
 
 func main() {
@@ -83,6 +86,25 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		}
 
 		router.SetNotFoundHandler(http.FileServer(http.Dir(envConfig.StaticFiles)))
+	}
+
+	eg, ctx := errgroup.WithContext(ctx)
+
+	var jwksManager *jwtauth.JWKSManager
+	if len(envConfig.JWKS) > 0 {
+		jwksManager, err = jwtauth.NewKeyManagerFromURLs(envConfig.JWKS...)
+		if err != nil {
+			return fmt.Errorf("failed to load JWKS: %w", err)
+		}
+		if router == nil {
+			return fmt.Errorf("JWKS configured but no public port")
+		}
+
+		router.AuthFunc = jwtauth.JWKSAuthFunc(jwksManager)
+		eg.Go(func() error {
+			return jwksManager.Run(ctx)
+		})
+
 	}
 
 	allServices := make([]protoreflect.ServiceDescriptor, 0)
@@ -140,8 +162,6 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		return fmt.Errorf("no router and no worker. Nothing to do")
 	}
 
-	eg, ctx := errgroup.WithContext(ctx)
-
 	if router != nil {
 		swaggerDocument, err := swagger.Build(router.CodecOptions, allServices)
 		if err != nil {
@@ -155,6 +175,13 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		srv := http.Server{
 			Handler: router,
 			Addr:    fmt.Sprintf(":%d", envConfig.PublicPort),
+		}
+
+		if jwksManager != nil {
+			// Wait for keys to be loaded before starting the server
+			if err := jwksManager.WaitForKeys(ctx); err != nil {
+				return fmt.Errorf("failed to load JWKS: %w", err)
+			}
 		}
 
 		go func() {
