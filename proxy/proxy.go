@@ -22,6 +22,11 @@ import (
 	"gopkg.daemonl.com/log"
 )
 
+// AuthFunc translates a request into headers to pass on to the remote server
+// Errors which implement gRPC status will be returned to the client as HTTP
+// errors, otherwise 500 with a log line
+type AuthFunc func(context.Context, *http.Request) (map[string]string, error)
+
 type Invoker interface {
 	Invoke(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
 }
@@ -31,6 +36,8 @@ type Router struct {
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
 	CodecOptions           jsonapi.Options
+
+	AuthFunc AuthFunc
 }
 
 func NewRouter() *Router {
@@ -135,6 +142,10 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 		ForwardResponseHeaders: rr.ForwardResponseHeaders,
 		ForwardRequestHeaders:  rr.ForwardRequestHeaders,
 		CodecOptions:           rr.CodecOptions,
+
+		// TODO: Customize this based on reflection parameters, e.g. scopes,
+		// tenant ID etc
+		authFunc: rr.AuthFunc,
 	}
 
 	return handler, nil
@@ -151,6 +162,7 @@ type Method struct {
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
 	CodecOptions           jsonapi.Options
+	authFunc               AuthFunc
 }
 
 func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
@@ -203,6 +215,17 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		md[key] = v[0] // only one value in gRPC
+	}
+
+	if mm.authFunc != nil {
+		authHeaders, err := mm.authFunc(ctx, r)
+		if err != nil {
+			doUserError(ctx, w, err)
+			return
+		}
+		for key, val := range authHeaders {
+			md[key] = val
+		}
 	}
 
 	// Send request header
