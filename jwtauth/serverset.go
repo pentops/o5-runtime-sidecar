@@ -129,18 +129,18 @@ func (km *JWKSManager) mergeKeys() {
 	km.jwksBytes = keyBytes
 }
 
-func (ss *JWKSManager) JWKS() []byte {
-	ss.jwksMutex.RLock()
-	defer ss.jwksMutex.RUnlock()
-	return ss.jwksBytes
+func (km *JWKSManager) JWKS() []byte {
+	km.jwksMutex.RLock()
+	defer km.jwksMutex.RUnlock()
+	return km.jwksBytes
 }
 
-func (ss *JWKSManager) GetKeys(keyID string) ([]jose.JSONWebKey, error) {
-	ss.mutex.RLock()
-	defer ss.mutex.RUnlock()
+func (km *JWKSManager) GetKeys(keyID string) ([]jose.JSONWebKey, error) {
+	km.mutex.RLock()
+	defer km.mutex.RUnlock()
 	keys := make([]jose.JSONWebKey, 0, 1)
 
-	for _, server := range ss.servers {
+	for _, server := range km.servers {
 		serverKeys := server.Keys()
 		for _, key := range serverKeys {
 			if key.KeyID == keyID {
@@ -150,6 +150,24 @@ func (ss *JWKSManager) GetKeys(keyID string) ([]jose.JSONWebKey, error) {
 	}
 
 	return keys, nil
+}
+
+func (km *JWKSManager) AddSource(source KeySource) {
+	km.mutex.RLock()
+	defer km.mutex.RUnlock()
+	km.servers = append(km.servers, source)
+}
+
+type DirectKeySource struct {
+	KeySet jose.JSONWebKeySet
+}
+
+func (ss *DirectKeySource) Keys() []jose.JSONWebKey {
+	return ss.KeySet.Keys
+}
+
+func (ss *DirectKeySource) Refresh(ctx context.Context) (time.Duration, error) {
+	return time.Hour, nil
 }
 
 type HTTPKeySource struct {
