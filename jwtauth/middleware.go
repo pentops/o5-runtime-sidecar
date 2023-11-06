@@ -61,17 +61,13 @@ func JWKSAuthFunc(jwks JWKS) proxy.AuthFunc {
 		if err != nil {
 			return nil, status.Error(codes.Unauthenticated, err.Error())
 		}
-		if len(keys) == 0 {
+		if len(keys) != 1 {
 			return nil, status.Error(codes.Unauthenticated, NoTrustedKeyMessage)
 		}
 
-		var verifiedBytes []byte
-		for _, key := range keys {
-			verifiedBytes, err = sig.Verify(key)
-			if err == nil {
-				break
-			}
-			log.WithError(ctx, err).Error("verifying token")
+		verifiedBytes, err := sig.Verify(keys[0])
+		if err != nil {
+			return nil, err
 		}
 
 		if verifiedBytes == nil {

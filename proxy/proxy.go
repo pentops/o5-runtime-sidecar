@@ -10,6 +10,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/pentops/custom-proto-api/jsonapi"
+	"github.com/pentops/o5-go/auth/v1/auth_pb"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -107,6 +108,8 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 	methodOptions := method.Options().(*descriptorpb.MethodOptions)
 	httpOpt := proto.GetExtension(methodOptions, annotations.E_Http).(*annotations.HttpRule)
 
+	authOpt := proto.GetExtension(methodOptions, auth_pb.E_Auth).(*auth_pb.AuthMethodOptions)
+
 	var httpMethod string
 	var httpPath string
 
@@ -146,6 +149,22 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 		// TODO: Customize this based on reflection parameters, e.g. scopes,
 		// tenant ID etc
 		authFunc: rr.AuthFunc,
+	}
+
+	if authOpt != nil {
+		switch authOpt.AuthMethod.(type) {
+		case *auth_pb.AuthMethodOptions_None:
+			handler.authFunc = nil
+		case *auth_pb.AuthMethodOptions_JwtBearer:
+			handler.authFunc = func(ctx context.Context, r *http.Request) (map[string]string, error) {
+				authed, err := rr.AuthFunc(ctx, r)
+				if err != nil {
+					return nil, err
+				}
+				// TODO: Scopes etc
+				return authed, nil
+			}
+		}
 	}
 
 	return handler, nil
@@ -199,6 +218,11 @@ func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 
 func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	ctx = log.WithFields(ctx, map[string]interface{}{
+		"httpMethod": r.Method,
+		"httpURL":    r.URL.String(),
+		"gRPCMethod": mm.FullName,
+	})
 
 	inputMessage, err := mm.mapRequest(r)
 	if err != nil {
@@ -225,7 +249,9 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		for key, val := range authHeaders {
 			md[key] = val
+
 		}
+		ctx = log.WithField(ctx, "authHeaders", authHeaders)
 	}
 
 	// Send request header
@@ -264,11 +290,13 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		log.WithError(ctx, err).Error("Failed to write response")
 		return
 	}
+	log.Info(ctx, "Request completed")
 }
 
 func doUserError(ctx context.Context, w http.ResponseWriter, err error) {
 	// TODO: Handle specific gRPC trailer type errors
 	if statusError, isStatusError := status.FromError(err); isStatusError {
+		log.WithField(ctx, "httpError", statusError).Info("User error")
 		doStatusError(ctx, w, statusError)
 		return
 	}
