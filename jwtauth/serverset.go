@@ -70,23 +70,19 @@ func (km *JWKSManager) logError(ctx context.Context, err error) {
 }
 
 // Run fetches once from each source, then refreshes the keys based on cache
-// control headers.
+// control headers. If the initial load fails repeatedly this will exit with an
+// error
 func (km *JWKSManager) Run(ctx context.Context) error {
+	initGroup := sync.WaitGroup{}
 	eg, ctx := errgroup.WithContext(ctx)
 	for _, server := range km.servers {
 		server := server
-		duration, err := server.Refresh(ctx)
-		if err != nil {
-			// Initial Fetch must work
-			go func() {
-				km.initialLoad <- err
-				close(km.initialLoad)
-			}()
-			return err
-		}
-		km.mergeKeys()
-
+		initGroup.Add(1)
 		eg.Go(func() error {
+			var duration time.Duration
+			var err error
+			loadedOnce := false
+			errorCount := 0
 			for {
 				select {
 				case <-ctx.Done():
@@ -95,15 +91,29 @@ func (km *JWKSManager) Run(ctx context.Context) error {
 					duration, err = server.Refresh(ctx)
 					if err != nil {
 						km.logError(ctx, err)
+						errorCount++
+						if !loadedOnce && errorCount > 5 {
+							return err
+						} else {
+							duration = time.Second * 5
+						}
 					} else {
 						km.mergeKeys()
+						if !loadedOnce {
+							loadedOnce = true
+							initGroup.Done()
+						}
+						errorCount = 0
 					}
 				}
 			}
 		})
 	}
 
-	close(km.initialLoad)
+	go func() {
+		initGroup.Wait()
+		close(km.initialLoad)
+	}()
 
 	return eg.Wait()
 }

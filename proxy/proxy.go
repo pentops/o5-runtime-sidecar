@@ -145,10 +145,6 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 		ForwardResponseHeaders: rr.ForwardResponseHeaders,
 		ForwardRequestHeaders:  rr.ForwardRequestHeaders,
 		CodecOptions:           rr.CodecOptions,
-
-		// TODO: Customize this based on reflection parameters, e.g. scopes,
-		// tenant ID etc
-		authFunc: rr.AuthFunc,
 	}
 
 	if authOpt != nil {
@@ -156,7 +152,11 @@ func (rr *Router) buildMethod(method protoreflect.MethodDescriptor, conn Invoker
 		case *auth_pb.AuthMethodOptions_None:
 			handler.authFunc = nil
 		case *auth_pb.AuthMethodOptions_JwtBearer:
+			if rr.AuthFunc == nil {
+				return nil, fmt.Errorf("auth method %T requires a global auth function", authOpt.AuthMethod)
+			}
 			handler.authFunc = func(ctx context.Context, r *http.Request) (map[string]string, error) {
+
 				authed, err := rr.AuthFunc(ctx, r)
 				if err != nil {
 					return nil, err
