@@ -240,6 +240,7 @@ func (mm *Method) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		md[key] = v[0] // only one value in gRPC
 	}
+	ctx = log.WithField(ctx, "passthroughHeaders", md)
 
 	if mm.authFunc != nil {
 		authHeaders, err := mm.authFunc(ctx, r)
