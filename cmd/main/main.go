@@ -91,13 +91,10 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
 	var jwksManager *jwtauth.JWKSManager
-	if len(envConfig.JWKS) > 0 {
+	if router != nil && len(envConfig.JWKS) > 0 {
 		jwksManager, err = jwtauth.NewKeyManagerFromURLs(envConfig.JWKS...)
 		if err != nil {
 			return fmt.Errorf("failed to load JWKS: %w", err)
-		}
-		if router == nil {
-			return fmt.Errorf("JWKS configured but no public port")
 		}
 
 		router.AuthFunc = jwtauth.JWKSAuthFunc(jwksManager)
