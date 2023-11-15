@@ -1,5 +1,5 @@
-buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230914171853-63dfe56cc2c4.1 h1:2gmp+PRca1fqQHf/WMKOgu9inVb0R0N07TucgY3QZCQ=
-buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230914171853-63dfe56cc2c4.1/go.mod h1:xafc+XIsTxTy76GJQ1TKgvJWsSugFBqMaN27WhUblew=
+buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20231106192134-1baebb0a1518.2 h1:iRWpWLm1nrsCHBVhibqPJQB3iIf3FRsAXioJVU8m6w0=
+buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20231106192134-1baebb0a1518.2/go.mod h1:xafc+XIsTxTy76GJQ1TKgvJWsSugFBqMaN27WhUblew=
 github.com/DATA-DOG/go-sqlmock v1.5.0 h1:Shsta01QNfFxHCfpW6YH2STWB0MudeXXEWMr20OEh60=
 github.com/DATA-DOG/go-sqlmock v1.5.0/go.mod h1:f/Ixk793poVmq4qj/V1dPUg2JEAKC73Q5eFN3EC/SaM=
 github.com/aws/aws-sdk-go-v2 v1.21.0/go.mod h1:/RfNgGmRxI+iFOB1OeJUyxiU+9s88k3pfHvDagGEp0M=
@@ -60,8 +60,8 @@ github.com/pentops/custom-proto-api v0.0.0-20231108221532-23abaf2191cd h1:CrP6Eu
 github.com/pentops/custom-proto-api v0.0.0-20231108221532-23abaf2191cd/go.mod h1:bWM4waZoKSKQVrREPhGrYPn29Bz1Q2kVvEcP/HsSsLw=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576 h1:A/vY7Qiv1S/1mUtacZQVoXicaYiiaSR7PInSUcaMOpA=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
-github.com/pentops/o5-go v0.0.0-20231107000020-504c08975ba6 h1:z8QhtrIal1YhFuE6+LwQPsVm4I2pl5J0TbMsS6mK2qQ=
-github.com/pentops/o5-go v0.0.0-20231107000020-504c08975ba6/go.mod h1:YREzbtRQB7StF9H49EBFAzlk0hsD1h2tkMlEb7ybN2U=
+github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f h1:HCdijuzdctcO8DRy14LemFVk//xw7bPyzr2xY63v6BY=
+github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f/go.mod h1:O+4h8TLk1cKGt/xDX1ThMg57ppoQXXPhxs57fxQK2ZE=
 github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5 h1:09bSwWuVlJ2ac3caVja4LBLhywvs6Rhev7uijnBzyAs=
 github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5/go.mod h1:8ggrY3eTtY+8xMOge3jXeMQTCe59lr3Hmi/H5PRNEL0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

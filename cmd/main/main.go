@@ -45,7 +45,7 @@ func main() {
 
 	ctx := context.Background()
 	ctx = log.WithFields(ctx, map[string]interface{}{
-		"application": "userauth",
+		"application": "o5-runtime-sidecar",
 		"version":     Version,
 	})
 
@@ -104,7 +104,7 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 
 	}
 
-	allServices := make([]protoreflect.ServiceDescriptor, 0)
+	httpServices := make([]protoreflect.ServiceDescriptor, 0)
 
 	endpoints := strings.Split(envConfig.Service, ",")
 	for _, endpoint := range endpoints {
@@ -131,7 +131,6 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		// TODO: Custom forwarding headers
 
 		for _, ss := range services {
-			allServices = append(allServices, ss)
 			name := string(ss.FullName())
 			switch {
 			case strings.HasSuffix(name, "Service"):
@@ -139,14 +138,15 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 					return fmt.Errorf("service %s requires a public port", name)
 				}
 				if err := router.RegisterService(ss, conn); err != nil {
-					return err
+					return fmt.Errorf("register service %s: %w", name, err)
 				}
+				httpServices = append(httpServices, ss)
 			case strings.HasSuffix(name, "Topic"):
 				if worker == nil {
 					return fmt.Errorf("topic %s requires an SQS URL", name)
 				}
 				if err := worker.RegisterService(ss, conn); err != nil {
-					return err
+					return fmt.Errorf("register worker %s: %w", name, err)
 				}
 			default:
 				log.WithField(ctx, "service", name).Error("Unknown service type")
@@ -160,9 +160,9 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 	}
 
 	if router != nil {
-		swaggerDocument, err := swagger.Build(router.CodecOptions, allServices)
+		swaggerDocument, err := swagger.Build(router.CodecOptions, httpServices)
 		if err != nil {
-			return err
+			return fmt.Errorf("building swagger: %w", err)
 		}
 
 		if err := router.StaticJSON("/swagger.json", swaggerDocument); err != nil {

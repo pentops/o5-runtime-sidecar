@@ -13,7 +13,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pentops/custom-proto-api v0.0.0-20231108221532-23abaf2191cd
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
-	github.com/pentops/o5-go v0.0.0-20231107000020-504c08975ba6
+	github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sync v0.4.0
@@ -27,7 +27,7 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20230914171853-63dfe56cc2c4.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.31.0-20231106192134-1baebb0a1518.2 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.41 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.13.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.1.43 // indirect
@@ -51,3 +51,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231012201019-e917dd12ba7a // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/pentops/custom-proto-api => ../custom-proto-api

@@ -2,11 +2,13 @@ package sqslink
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/pentops/log.go/log"
+	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -15,6 +17,8 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+const RawMessageName = "/o5.messaging.v1.topic.RawMessageTopic/Raw"
 
 type SQSAPI interface {
 	ReceiveMessage(ctx context.Context, input *sqs.ReceiveMessageInput, opts ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
@@ -44,10 +48,24 @@ type service struct {
 	requestMessage protoreflect.MessageDescriptor
 	invoker        Invoker
 	fullName       string
+	customParser   func([]byte) (proto.Message, error)
 }
 
-func (ss service) parseMessage(contentType string, raw []byte) (*dynamicpb.Message, error) {
+func (ss service) parseMessage(contentType string, raw []byte) (proto.Message, error) {
+
+	if ss.customParser != nil {
+		return ss.customParser(raw)
+	}
+
 	msg := dynamicpb.NewMessage(ss.requestMessage)
+
+	if contentType == "" {
+		if raw[0] == '{' {
+			contentType = "application/json"
+		} else {
+			contentType = "application/protobuf"
+		}
+	}
 
 	switch contentType {
 	case "application/json":
@@ -55,7 +73,12 @@ func (ss service) parseMessage(contentType string, raw []byte) (*dynamicpb.Messa
 			return nil, fmt.Errorf("failed to unmarshal json: %w", err)
 		}
 	case "application/protobuf":
-		if err := proto.Unmarshal(raw, msg); err != nil {
+		msgBytes, err := base64.StdEncoding.DecodeString(string(raw))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode base64: %w", err)
+		}
+
+		if err := proto.Unmarshal(msgBytes, msg); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
 		}
 	default:
@@ -86,6 +109,16 @@ func (ww *Worker) registerMethod(method protoreflect.MethodDescriptor, invoker I
 		requestMessage: method.Input(),
 		fullName:       fmt.Sprintf("/%s/%s", serviceName, method.Name()),
 		invoker:        invoker,
+	}
+
+	log.WithField(context.Background(), "service", ss.fullName).Debug("Registering service")
+
+	if ss.fullName == RawMessageName {
+		ss.customParser = func(b []byte) (proto.Message, error) {
+			return &messaging_tpb.RawMessage{
+				Payload: b,
+			}, nil
+		}
 	}
 
 	ww.services[ss.fullName] = ss
@@ -144,9 +177,15 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	handler, inputMessage, err := ww.parseMessage(msg)
 	if err != nil {
 		// Leave it here, we need to retry
-		log.WithError(ctx, err).Error("failed to handle dead message")
+		log.WithError(ctx, err).Error("failed to handle message")
 		return
 	}
+
+	ctx = log.WithFields(ctx, map[string]interface{}{
+		"grpc-service": handler.fullName,
+		"message-id":   *msg.MessageId,
+	})
+	log.Debug(ctx, "begin handle message")
 
 	outputMessage := &emptypb.Empty{}
 
@@ -161,6 +200,8 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		return
 	}
 
+	log.WithFields(ctx, map[string]interface{}{}).Info("handled message")
+
 	// Delete
 	_, err = ww.SQSClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 		QueueUrl:      &ww.QueueURL,
@@ -172,19 +213,22 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	}
 }
 
-func (ww *Worker) parseMessage(msg types.Message) (*service, *dynamicpb.Message, error) {
-	// Parse Message
-	serviceNameAttributeValue, ok := msg.MessageAttributes[serviceAttribute]
-	if !ok {
-		return nil, nil, fmt.Errorf("no %s attribute", serviceAttribute)
-	}
-	serviceName := *serviceNameAttributeValue.StringValue
+func (ww *Worker) parseMessage(msg types.Message) (*service, proto.Message, error) {
 
-	contentTypeAttributeValue, ok := msg.MessageAttributes[contentTypeAttribute]
-	if !ok {
-		return nil, nil, fmt.Errorf("no %s attribute", contentTypeAttribute)
+	// Parse Message
+	var serviceName string
+	serviceNameAttributeValue, ok := msg.MessageAttributes[serviceAttribute]
+	if ok {
+		serviceName = *serviceNameAttributeValue.StringValue
+	} else {
+		serviceName = RawMessageName
 	}
-	contentType := *contentTypeAttributeValue.StringValue
+
+	var contentType string
+	contentTypeAttributeValue, ok := msg.MessageAttributes[contentTypeAttribute]
+	if ok {
+		contentType = *contentTypeAttributeValue.StringValue
+	}
 
 	handler, ok := ww.services[serviceName]
 	if !ok {
@@ -195,7 +239,7 @@ func (ww *Worker) parseMessage(msg types.Message) (*service, *dynamicpb.Message,
 
 	parsed, err := handler.parseMessage(contentType, []byte(*msg.Body))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("parsing message for service %s: %w", serviceName, err)
 	}
 
 	return handler, parsed, nil

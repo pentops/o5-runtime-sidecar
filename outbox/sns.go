@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
+	"github.com/pentops/log.go/log"
 )
 
 type SNSAPI interface {
@@ -61,6 +62,11 @@ func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*
 				MessageAttributes: attributes,
 			})
 		}
+
+		log.WithFields(ctx, map[string]interface{}{
+			"destination": dest,
+			"count":       len(batch),
+		}).Debug("Sending Outbox Batch")
 
 		out, err := b.client.PublishBatch(ctx, &sns.PublishBatchInput{
 			PublishBatchRequestEntries: entries,
