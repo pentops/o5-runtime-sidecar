@@ -41,7 +41,7 @@ type Router struct {
 	AuthFunc AuthFunc
 }
 
-func NewRouter() *Router {
+func NewRouter(codecOptions jsonapi.Options) *Router {
 	return &Router{
 		router: mux.NewRouter(),
 		ForwardResponseHeaders: map[string]bool{
@@ -52,13 +52,7 @@ func NewRouter() *Router {
 			"cookie": true,
 			"origin": true,
 		},
-		CodecOptions: jsonapi.Options{
-			ShortEnums: &jsonapi.ShortEnumsOption{
-				UnspecifiedSuffix: "UNSPECIFIED",
-				StrictUnmarshal:   true,
-			},
-			WrapOneof: true,
-		},
+		CodecOptions: codecOptions,
 	}
 }
 

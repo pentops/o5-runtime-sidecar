@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/gorilla/mux v1.8.0
 	github.com/lib/pq v1.10.9
-	github.com/pentops/custom-proto-api v0.0.0-20231115004254-a71e68a356ae
+	github.com/pentops/custom-proto-api v0.0.0-20231115193247-b07a15032ede
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
 	github.com/pentops/o5-go v0.0.0-20231115031329-102ad07f03b7
 	github.com/pquerna/cachecontrol v0.2.0

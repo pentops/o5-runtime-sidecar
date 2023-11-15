@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/pentops/custom-proto-api/jsonapi"
 	"github.com/pentops/custom-proto-api/swagger"
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
@@ -69,6 +70,14 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	codecOptions := jsonapi.Options{
+		ShortEnums: &jsonapi.ShortEnumsOption{
+			UnspecifiedSuffix: "UNSPECIFIED",
+			StrictUnmarshal:   true,
+		},
+		WrapOneof: true,
+	}
+
 	var snsSender *outbox.SNSBatcher
 
 	if envConfig.PostgresOutboxURI != "" || envConfig.SQSURL != "" {
@@ -86,7 +95,7 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 
 	var router *proxy.Router
 	if envConfig.PublicPort != 0 {
-		router = proxy.NewRouter()
+		router = proxy.NewRouter(codecOptions)
 	}
 
 	if envConfig.StaticFiles != "" {

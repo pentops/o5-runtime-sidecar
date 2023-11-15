@@ -11,17 +11,26 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
+	"github.com/pentops/custom-proto-api/jsonapi"
 	"github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 )
 
+var testCodecOptions = jsonapi.Options{
+	ShortEnums: &jsonapi.ShortEnumsOption{
+		UnspecifiedSuffix: "UNSPECIFIED",
+		StrictUnmarshal:   true,
+	},
+	WrapOneof: true,
+}
+
 func TestGetHandlerMapping(t *testing.T) {
 
 	fd := testpb.File_test_v1_test_proto.Services().Get(0).Methods().Get(0)
 
-	rr := NewRouter()
+	rr := NewRouter(testCodecOptions)
 	method, err := rr.buildMethod(fd, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +78,7 @@ func TestBodyHandlerMapping(t *testing.T) {
 
 	fd := testpb.File_test_v1_test_proto.Services().Get(0).Methods().Get(1)
 
-	rr := NewRouter()
+	rr := NewRouter(testCodecOptions)
 	method, err := rr.buildMethod(fd, nil)
 	if err != nil {
 		t.Fatal(err)
