@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 
+	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
 )
 
@@ -108,11 +109,13 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 
 	eg, ctx := errgroup.WithContext(ctx)
 
-	var jwksManager *jwtauth.JWKSManager
+	var jwksManager *jwks.JWKSManager
 	if router != nil && len(envConfig.JWKS) > 0 {
-		jwksManager, err = jwtauth.NewKeyManagerFromURLs(envConfig.JWKS...)
-		if err != nil {
-			return fmt.Errorf("failed to load JWKS: %w", err)
+
+		jwksManager = jwks.NewKeyManager()
+
+		if err := jwksManager.AddSourceURLs(envConfig.JWKS...); err != nil {
+			return err
 		}
 
 		router.AuthFunc = jwtauth.JWKSAuthFunc(jwksManager)

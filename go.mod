@@ -1,6 +1,6 @@
 module github.com/pentops/o5-runtime-sidecar
 
-go 1.21.3
+go 1.21.4
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.21.2
@@ -12,16 +12,16 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/lib/pq v1.10.9
 	github.com/pentops/custom-proto-api v0.0.0-20231115193247-b07a15032ede
+	github.com/pentops/jwtauth v0.0.0-20231115223623-f90f9e891cb4
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
 	github.com/pentops/o5-go v0.0.0-20231115031329-102ad07f03b7
-	github.com/pquerna/cachecontrol v0.2.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sync v0.4.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20231016165738-49dd2c1f3d0b
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.daemonl.com/envconf v0.0.0-20220909014755-d65ec77bd452
-	gopkg.daemonl.com/log v0.0.12
+	gopkg.daemonl.com/log v0.0.13
 	gopkg.daemonl.com/sqrlx v0.0.25
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
@@ -42,11 +42,12 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/crypto v0.14.0 // indirect
+	github.com/pquerna/cachecontrol v0.2.0 // indirect
+	golang.org/x/crypto v0.15.0 // indirect
 	golang.org/x/exp v0.0.0-20230711153332-06a737ee72cb // indirect
 	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
-	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/sys v0.14.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20231012201019-e917dd12ba7a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231012201019-e917dd12ba7a // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
