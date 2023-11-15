@@ -13,7 +13,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pentops/custom-proto-api v0.0.0-20231115004254-a71e68a356ae
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
-	github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f
+	github.com/pentops/o5-go v0.0.0-20231115031329-102ad07f03b7
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sync v0.4.0

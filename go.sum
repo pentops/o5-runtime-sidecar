@@ -60,8 +60,8 @@ github.com/pentops/custom-proto-api v0.0.0-20231115004254-a71e68a356ae h1:e53IqJ
 github.com/pentops/custom-proto-api v0.0.0-20231115004254-a71e68a356ae/go.mod h1:bWM4waZoKSKQVrREPhGrYPn29Bz1Q2kVvEcP/HsSsLw=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576 h1:A/vY7Qiv1S/1mUtacZQVoXicaYiiaSR7PInSUcaMOpA=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
-github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f h1:HCdijuzdctcO8DRy14LemFVk//xw7bPyzr2xY63v6BY=
-github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f/go.mod h1:O+4h8TLk1cKGt/xDX1ThMg57ppoQXXPhxs57fxQK2ZE=
+github.com/pentops/o5-go v0.0.0-20231115031329-102ad07f03b7 h1:dCbWfJbbMtqBz2wHA8opNNQVdMcjUEXgnRbzWQ73/RM=
+github.com/pentops/o5-go v0.0.0-20231115031329-102ad07f03b7/go.mod h1:O+4h8TLk1cKGt/xDX1ThMg57ppoQXXPhxs57fxQK2ZE=
 github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5 h1:09bSwWuVlJ2ac3caVja4LBLhywvs6Rhev7uijnBzyAs=
 github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5/go.mod h1:8ggrY3eTtY+8xMOge3jXeMQTCe59lr3Hmi/H5PRNEL0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

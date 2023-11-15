@@ -9,10 +9,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/pentops/log.go/log"
+	"github.com/pentops/o5-go/dante/v1/dante_pb"
+	"github.com/pentops/o5-go/dante/v1/dante_tpb"
+	"google.golang.org/protobuf/proto"
 )
 
 type SNSAPI interface {
 	PublishBatch(ctx context.Context, params *sns.PublishBatchInput, optFns ...func(*sns.Options)) (*sns.PublishBatchOutput, error)
+	Publish(ctx context.Context, params *sns.PublishInput, optFns ...func(*sns.Options)) (*sns.PublishOutput, error)
 }
 
 type SNSBatcher struct {
@@ -25,6 +29,72 @@ func NewSNSBatcher(client SNSAPI, prefix string) *SNSBatcher {
 		client: client,
 		prefix: prefix,
 	}
+}
+
+func (b *SNSBatcher) DeadLetter(ctx context.Context, message *dante_pb.DeadMessage) error {
+	outMessage := &dante_tpb.DeadMessage{
+		Dead: message,
+	}
+
+	protoBody, err := proto.Marshal(outMessage)
+	if err != nil {
+		return err
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(protoBody)
+
+	attributes := map[string]types.MessageAttributeValue{}
+	headers := outMessage.MessagingHeaders()
+
+	for key, val := range headers {
+		if val == "" {
+			continue
+		}
+		attributes[key] = types.MessageAttributeValue{
+			StringValue: aws.String(val),
+			DataType:    aws.String("String"),
+		}
+	}
+
+	dest := b.prefix + outMessage.MessagingTopic()
+
+	_, err = b.client.Publish(ctx, &sns.PublishInput{
+		Message:           aws.String(encoded),
+		MessageAttributes: attributes,
+		TopicArn:          aws.String(dest),
+	})
+
+	return err
+}
+
+type snsMessage struct {
+	body       string
+	attributes map[string]types.MessageAttributeValue
+}
+
+func mapToHeaders(attrs map[string][]string) map[string]types.MessageAttributeValue {
+	attributes := map[string]types.MessageAttributeValue{}
+	for key, vals := range attrs {
+		for _, val := range vals {
+			if val == "" {
+				continue
+			}
+			attributes[key] = types.MessageAttributeValue{
+				StringValue: aws.String(val),
+				DataType:    aws.String("String"),
+			}
+		}
+	}
+	return attributes
+}
+
+func encodeMessage(msg *Message) (*snsMessage, error) {
+	body := base64.StdEncoding.EncodeToString(msg.Message)
+	attributes := mapToHeaders(msg.Headers)
+	return &snsMessage{
+		body:       body,
+		attributes: attributes,
+	}, nil
 }
 
 func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*Message) error {
@@ -43,23 +113,15 @@ func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*
 
 		var entries []types.PublishBatchRequestEntry
 		for _, msg := range batch {
-			body := base64.StdEncoding.EncodeToString(msg.Message)
-			attributes := map[string]types.MessageAttributeValue{}
-			for key, vals := range msg.Headers {
-				for _, val := range vals {
-					if val == "" {
-						continue
-					}
-					attributes[key] = types.MessageAttributeValue{
-						StringValue: aws.String(val),
-						DataType:    aws.String("String"),
-					}
-				}
+			encoded, err := encodeMessage(msg)
+			if err != nil {
+				return err
 			}
+
 			entries = append(entries, types.PublishBatchRequestEntry{
 				Id:                aws.String(msg.ID),
-				Message:           aws.String(body),
-				MessageAttributes: attributes,
+				Message:           aws.String(encoded.body),
+				MessageAttributes: encoded.attributes,
 			})
 		}
 

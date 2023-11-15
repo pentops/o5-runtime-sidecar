@@ -69,10 +69,19 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
+	var snsSender *outbox.SNSBatcher
+
+	if envConfig.PostgresOutboxURI != "" || envConfig.SQSURL != "" {
+		if envConfig.SNSPrefix == "" {
+			return fmt.Errorf("SNS prefix required when using Postgres outbox")
+		}
+		snsSender = outbox.NewSNSBatcher(sns.NewFromConfig(awsConfig), envConfig.SNSPrefix)
+	}
+
 	var worker *sqslink.Worker
 	if envConfig.SQSURL != "" {
 		sqsClient := sqs.NewFromConfig(awsConfig)
-		worker = sqslink.NewWorker(sqsClient, envConfig.SQSURL)
+		worker = sqslink.NewWorker(sqsClient, envConfig.SQSURL, snsSender)
 	}
 
 	var router *proxy.Router
@@ -125,7 +134,6 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		}
 
 		// TODO: CORS
-		// TODO: Auth
 		// TODO: Logging
 		// TODO: Metrics
 		// TODO: Custom forwarding headers
@@ -198,10 +206,8 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 	}
 
 	if envConfig.PostgresOutboxURI != "" {
-		snsClient := sns.NewFromConfig(awsConfig)
-		sender := outbox.NewSNSBatcher(snsClient, envConfig.SNSPrefix)
 		eg.Go(func() error {
-			return outbox.Listen(ctx, envConfig.PostgresOutboxURI, sender)
+			return outbox.Listen(ctx, envConfig.PostgresOutboxURI, snsSender)
 		})
 	}
 

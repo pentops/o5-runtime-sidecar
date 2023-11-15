@@ -10,6 +10,7 @@ import (
 
 type mockSNSAPI struct {
 	requests []*sns.PublishBatchInput
+	SNSAPI
 }
 
 func (m *mockSNSAPI) PublishBatch(ctx context.Context, params *sns.PublishBatchInput, optFns ...func(*sns.Options)) (*sns.PublishBatchOutput, error) {
