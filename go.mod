@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.3.1
 	github.com/gorilla/mux v1.8.0
 	github.com/lib/pq v1.10.9
-	github.com/pentops/custom-proto-api v0.0.0-20231108221532-23abaf2191cd
+	github.com/pentops/custom-proto-api v0.0.0-20231115004254-a71e68a356ae
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
 	github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f
 	github.com/pquerna/cachecontrol v0.2.0
@@ -51,5 +51,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231012201019-e917dd12ba7a // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/pentops/custom-proto-api => ../custom-proto-api

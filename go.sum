@@ -56,8 +56,8 @@ github.com/jmespath/go-jmespath/internal/testify v1.5.1/go.mod h1:L3OGu8Wl2/fWfC
 github.com/lib/pq v1.10.3/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
 github.com/lib/pq v1.10.9 h1:YXG7RB+JIjhP29X+OtkiDnYaXQwpS4JEWq7dtCCRUEw=
 github.com/lib/pq v1.10.9/go.mod h1:AlVN5x4E4T544tWzH6hKfbfQvm3HdbOxrmggDNAPY9o=
-github.com/pentops/custom-proto-api v0.0.0-20231108221532-23abaf2191cd h1:CrP6EuALPn5IPKCvZ3QiXpZg2RKp7ajfH43SuR7pyVk=
-github.com/pentops/custom-proto-api v0.0.0-20231108221532-23abaf2191cd/go.mod h1:bWM4waZoKSKQVrREPhGrYPn29Bz1Q2kVvEcP/HsSsLw=
+github.com/pentops/custom-proto-api v0.0.0-20231115004254-a71e68a356ae h1:e53IqJKMFTe2GSk6ggDWUeTuHSRujSmo/hff3kBuNzA=
+github.com/pentops/custom-proto-api v0.0.0-20231115004254-a71e68a356ae/go.mod h1:bWM4waZoKSKQVrREPhGrYPn29Bz1Q2kVvEcP/HsSsLw=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576 h1:A/vY7Qiv1S/1mUtacZQVoXicaYiiaSR7PInSUcaMOpA=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
 github.com/pentops/o5-go v0.0.0-20231114212530-86e381d1ce4f h1:HCdijuzdctcO8DRy14LemFVk//xw7bPyzr2xY63v6BY=
