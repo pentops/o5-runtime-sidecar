@@ -299,7 +299,7 @@ func (ww *Worker) parseMessage(msg types.Message) (*Message, Handler, error) { /
 
 var messageIDNamespace = uuid.MustParse("B71AFF66-460A-424C-8927-9AF8C9135BF9")
 
-func (ww *Worker) killMessage(ctx context.Context, msg *Message, err error) error {
+func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error) error {
 
 	inputAny, err := anypb.New(msg.Proto)
 	if err != nil {
@@ -318,7 +318,7 @@ func (ww *Worker) killMessage(ctx context.Context, msg *Message, err error) erro
 		RejectedTimestamp: timestamppb.Now(),
 		Problem: &dante_pb.DeadMessage_UnhandledError{
 			UnhandledError: &dante_pb.UnhandledError{
-				Error: err.Error(),
+				Error: killError.Error(),
 			},
 		},
 		Payload: &dante_pb.Any{
