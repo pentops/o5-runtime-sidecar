@@ -78,6 +78,12 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		rt.Sender = outbox.NewSNSBatcher(sns.NewFromConfig(awsConfig), envConfig.SNSPrefix)
 	}
 
+	if envConfig.PostgresOutboxURI != "" {
+		if err := rt.AddOutbox(ctx, envConfig.PostgresOutboxURI); err != nil {
+			return fmt.Errorf("add outbox: %w", err)
+		}
+	}
+
 	if envConfig.SQSURL != "" {
 		sqsClient := sqs.NewFromConfig(awsConfig)
 		rt.Worker = sqslink.NewWorker(sqsClient, envConfig.SQSURL, rt.Sender)

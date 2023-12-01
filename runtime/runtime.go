@@ -3,6 +3,7 @@ package runtime
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -31,6 +32,8 @@ type Runtime struct {
 	httpServices []protoreflect.ServiceDescriptor
 
 	outboxURIs []string
+
+	connections []io.Closer
 }
 
 func NewRuntime() *Runtime {
@@ -39,7 +42,17 @@ func NewRuntime() *Runtime {
 	}
 }
 
+func (rt *Runtime) Close() error {
+	for _, conn := range rt.connections {
+		if err := conn.Close(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (rt *Runtime) Run(ctx context.Context) error {
+	defer rt.Close()
 	eg, ctx := errgroup.WithContext(ctx)
 
 	didAnything := false
@@ -115,8 +128,9 @@ func (rt *Runtime) AddRouter(port int, codecOptions jsonapi.Options) error {
 	rt.PublicPort = port
 	return nil
 }
+
 func (rt *Runtime) AddOutbox(ctx context.Context, outboxURI string) error {
-	if rt.Sender != nil {
+	if rt.Sender == nil {
 		return fmt.Errorf("outbox requires a sender")
 	}
 
@@ -150,7 +164,7 @@ func (rt *Runtime) AddEndpoint(ctx context.Context, endpoint string) error {
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}
-	defer conn.Close()
+	rt.connections = append(rt.connections, conn)
 
 	services, err := protoread.FetchServices(ctx, conn)
 	if err != nil {
@@ -177,7 +191,7 @@ func (rt *Runtime) AddEndpoint(ctx context.Context, endpoint string) error {
 			if rt.Worker == nil {
 				return fmt.Errorf("topic %s requires an SQS URL", name)
 			}
-			if err := rt.Worker.RegisterService(ss, conn); err != nil {
+			if err := rt.Worker.RegisterService(ctx, ss, conn); err != nil {
 				return fmt.Errorf("register worker %s: %w", name, err)
 			}
 		default:

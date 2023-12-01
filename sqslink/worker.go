@@ -74,18 +74,18 @@ type Endpoint interface {
 	RoundTrip(ctx context.Context, serviceName string, protoMessage []byte) error
 }
 
-func (ww *Worker) RegisterService(service protoreflect.ServiceDescriptor, invoker Invoker) error {
+func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker Invoker) error {
 	methods := service.Methods()
 	for ii := 0; ii < methods.Len(); ii++ {
 		method := methods.Get(ii)
-		if err := ww.registerMethod(method, invoker); err != nil {
+		if err := ww.registerMethod(ctx, method, invoker); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (ww *Worker) registerMethod(method protoreflect.MethodDescriptor, invoker Invoker) error {
+func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker Invoker) error {
 	serviceName := method.Parent().(protoreflect.ServiceDescriptor).FullName()
 	ss := &service{
 		requestMessage: method.Input(),
@@ -93,7 +93,7 @@ func (ww *Worker) registerMethod(method protoreflect.MethodDescriptor, invoker I
 		invoker:        invoker,
 	}
 
-	log.WithField(context.Background(), "service", ss.fullName).Debug("Registering service")
+	log.WithField(ctx, "service", ss.fullName).Debug("Registering service")
 
 	if ss.fullName == RawMessageName {
 		ss.customParser = func(b []byte) (proto.Message, error) {
@@ -185,6 +185,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	err = handler.HandleMessage(ctx, parsed)
 	if err != nil {
 		ctx = log.WithError(ctx, err)
+		log.Error(ctx, "Error handling message")
 		if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
 			log.Error(ctx, "Error handling message, leaving in queue")
 			return

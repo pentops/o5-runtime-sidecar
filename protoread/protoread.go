@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"gopkg.daemonl.com/log"
+	"github.com/pentops/log.go/log"
 )
 
 // FetchServices fetches the full reflection descriptor of all exposed services from a grpc server

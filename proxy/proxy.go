@@ -20,7 +20,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
-	"gopkg.daemonl.com/log"
+	"github.com/pentops/log.go/log"
 )
 
 // AuthFunc translates a request into headers to pass on to the remote server
