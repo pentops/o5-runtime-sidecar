@@ -1,6 +1,7 @@
 package sqslink
 
 import (
+	"context"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -15,7 +16,7 @@ func TestWorker(t *testing.T) {
 	ww := NewWorker(nil, "https://test.com/queue", nil)
 
 	fd := testpb.File_test_v1_test_proto.Services().Get(1).Methods().Get(0)
-	if err := ww.registerMethod(fd, nil); err != nil {
+	if err := ww.registerMethod(context.Background(), fd, nil); err != nil {
 		t.Fatal(err.Error())
 	}
 

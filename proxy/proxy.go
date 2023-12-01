@@ -9,7 +9,8 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/pentops/custom-proto-api/jsonapi"
+	"github.com/pentops/jsonapi/jsonapi"
+	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/auth/v1/auth_pb"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/grpc"
@@ -20,7 +21,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
-	"github.com/pentops/log.go/log"
 )
 
 // AuthFunc translates a request into headers to pass on to the remote server

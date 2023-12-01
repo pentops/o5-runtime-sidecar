@@ -1,4 +1,4 @@
-package runtime
+package runner
 
 import (
 	"context"
@@ -7,8 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pentops/custom-proto-api/jsonapi"
-	"github.com/pentops/custom-proto-api/swagger"
+	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"
@@ -34,6 +33,7 @@ type Runtime struct {
 	outboxURIs []string
 
 	connections []io.Closer
+	endpoints   []string
 }
 
 func NewRuntime() *Runtime {
@@ -72,16 +72,18 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		})
 	}
 
-	if rt.router != nil {
-		didAnything = true
-		swaggerDocument, err := swagger.Build(rt.router.CodecOptions, rt.httpServices)
-		if err != nil {
-			return fmt.Errorf("building swagger: %w", err)
+	for _, endpoint := range rt.endpoints {
+		endpoint := endpoint
+		if err := rt.registerEndpoint(ctx, endpoint); err != nil {
+			return fmt.Errorf("register endpoint %s: %w", endpoint, err)
 		}
+	}
 
-		if err := rt.router.StaticJSON("/swagger.json", swaggerDocument); err != nil {
-			return err
-		}
+	if rt.router != nil {
+		// TODO: CORS
+		// TODO: Metrics
+
+		didAnything = true
 
 		srv := http.Server{
 			Handler: rt.router,
@@ -159,6 +161,11 @@ func (rt *Runtime) AddJWKS(ctx context.Context, sources ...string) error {
 }
 
 func (rt *Runtime) AddEndpoint(ctx context.Context, endpoint string) error {
+	rt.endpoints = append(rt.endpoints, endpoint)
+	return nil
+}
+
+func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error {
 
 	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
@@ -170,11 +177,6 @@ func (rt *Runtime) AddEndpoint(ctx context.Context, endpoint string) error {
 	if err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}
-
-	// TODO: CORS
-	// TODO: Logging
-	// TODO: Metrics
-	// TODO: Custom forwarding headers
 
 	for _, ss := range services {
 		name := string(ss.FullName())

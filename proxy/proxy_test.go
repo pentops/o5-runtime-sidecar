@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/pentops/custom-proto-api/jsonapi"
+	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"

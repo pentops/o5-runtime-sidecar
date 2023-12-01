@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pentops/custom-proto-api/jsonapi"
+	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
-	"github.com/pentops/o5-runtime-sidecar/runtime"
+	"github.com/pentops/o5-runtime-sidecar/runner"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"gopkg.daemonl.com/envconf"
 
@@ -69,7 +69,7 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 		WrapOneof: true,
 	}
 
-	rt := runtime.Runtime{}
+	rt := runner.NewRuntime()
 
 	if envConfig.PostgresOutboxURI != "" || envConfig.SQSURL != "" {
 		if envConfig.SNSPrefix == "" {
