@@ -309,6 +309,8 @@ func doError(ctx context.Context, w http.ResponseWriter, err error) {
 		http.Error(w, `{"error":"meta error marshalling error"}`, http.StatusInternalServerError)
 		return
 	}
+	headerOut := w.Header()
+	headerOut.Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusInternalServerError)
 	if _, err := w.Write(bytesOut); err != nil {
 		log.WithError(ctx, err).Error("Failed to write error response")
@@ -326,6 +328,9 @@ func doStatusError(ctx context.Context, w http.ResponseWriter, statusError *stat
 		http.Error(w, `{"error":"meta error marshalling error"}`, http.StatusInternalServerError)
 		return
 	}
+
+	headerOut := w.Header()
+	headerOut.Set("Content-Type", "application/json")
 
 	httpStatus, ok := statusToHTTPCode[statusError.Code()]
 	if !ok {
