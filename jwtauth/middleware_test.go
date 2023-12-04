@@ -75,7 +75,7 @@ func (tj *testJWKS) GetKeys(keyID string) ([]jose.JSONWebKey, error) {
 	return out, nil
 }
 
-func codeError(t testing.TB, err error, code codes.Code, contains ...string) {
+func codeError(t testing.TB, err error, code codes.Code, contains ...string) { // nolint:unparam
 	t.Helper()
 	if err == nil {
 		t.Errorf("Expected error, got nil")

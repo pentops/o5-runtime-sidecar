@@ -88,13 +88,13 @@ func mapToHeaders(attrs map[string][]string) map[string]types.MessageAttributeVa
 	return attributes
 }
 
-func encodeMessage(msg *Message) (*snsMessage, error) {
+func encodeMessage(msg *Message) *snsMessage {
 	body := base64.StdEncoding.EncodeToString(msg.Message)
 	attributes := mapToHeaders(msg.Headers)
 	return &snsMessage{
 		body:       body,
 		attributes: attributes,
-	}, nil
+	}
 }
 
 func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*Message) error {
@@ -113,10 +113,7 @@ func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*
 
 		var entries []types.PublishBatchRequestEntry
 		for _, msg := range batch {
-			encoded, err := encodeMessage(msg)
-			if err != nil {
-				return err
-			}
+			encoded := encodeMessage(msg)
 
 			entries = append(entries, types.PublishBatchRequestEntry{
 				Id:                aws.String(msg.ID),
