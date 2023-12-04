@@ -52,6 +52,7 @@ func (rt *Runtime) Close() error {
 }
 
 func (rt *Runtime) Run(ctx context.Context) error {
+	log.Debug(ctx, "Sidecar Running")
 	defer rt.Close()
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -152,11 +153,16 @@ func (rt *Runtime) StaticFiles(dirname string) error {
 func (rt *Runtime) AddJWKS(ctx context.Context, sources ...string) error {
 	jwksManager := jwks.NewKeyManager()
 
+	for _, source := range sources {
+		log.WithField(ctx, "source", source).Info("Adding JWKS source URL")
+	}
+
 	if err := jwksManager.AddSourceURLs(sources...); err != nil {
 		return err
 	}
 
 	rt.router.AuthFunc = jwtauth.JWKSAuthFunc(jwksManager)
+	rt.JWKS = jwksManager
 	return nil
 }
 

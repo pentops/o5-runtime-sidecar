@@ -20,7 +20,7 @@ const (
 	MissingAuthHeaderMessage  = "missing authorization header"
 	InvalidAuthHeaderMessage  = "invalid authorization header, must begin with 'Bearer '"
 	InvalidTokenFormatMessage = "invalid token format in authorization header, must be JWT"
-	NoTrustedKeyMessage       = "A valid JWT was found, however it was not signed by any trusted key"
+	NoTrustedKeyMessage       = "A valid JWT was found, but not signed with a trusted key"
 
 	VerifiedJWTHeader = "X-Verified-JWT"
 )
