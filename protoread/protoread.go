@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pentops/log.go/log"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
+	"google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"github.com/pentops/log.go/log"
 )
 
 // FetchServices fetches the full reflection descriptor of all exposed services from a grpc server
@@ -40,22 +40,22 @@ func FetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.S
 
 func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
 
-	client := grpc_reflection_v1alpha.NewServerReflectionClient(conn)
+	client := grpc_reflection_v1.NewServerReflectionClient(conn)
 
 	cc, err := client.ServerReflectionInfo(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	roundTrip := func(req *grpc_reflection_v1alpha.ServerReflectionRequest) (*grpc_reflection_v1alpha.ServerReflectionResponse, error) {
+	roundTrip := func(req *grpc_reflection_v1.ServerReflectionRequest) (*grpc_reflection_v1.ServerReflectionResponse, error) {
 		if err := cc.Send(req); err != nil {
 			return nil, err
 		}
 		return cc.Recv()
 	}
 
-	resp, err := roundTrip(&grpc_reflection_v1alpha.ServerReflectionRequest{
-		MessageRequest: &grpc_reflection_v1alpha.ServerReflectionRequest_ListServices{},
+	resp, err := roundTrip(&grpc_reflection_v1.ServerReflectionRequest{
+		MessageRequest: &grpc_reflection_v1.ServerReflectionRequest_ListServices{},
 	})
 	if err != nil {
 		return nil, err
@@ -72,8 +72,8 @@ func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.S
 
 		serviceNames = append(serviceNames, service.Name)
 
-		fileResp, err := roundTrip(&grpc_reflection_v1alpha.ServerReflectionRequest{
-			MessageRequest: &grpc_reflection_v1alpha.ServerReflectionRequest_FileContainingSymbol{
+		fileResp, err := roundTrip(&grpc_reflection_v1.ServerReflectionRequest{
+			MessageRequest: &grpc_reflection_v1.ServerReflectionRequest_FileContainingSymbol{
 				FileContainingSymbol: service.Name,
 			},
 		})
