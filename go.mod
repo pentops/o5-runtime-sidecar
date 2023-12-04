@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
-	github.com/pentops/jsonapi v0.0.0-20231123011150-74903e21d297
+	github.com/pentops/jsonapi v0.0.0-20231204062219-2da2a5ddb804
 	github.com/pentops/jwtauth v0.0.0-20231115224318-582b891a72f1
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
 	github.com/pentops/o5-go v0.0.0-20231130065829-e542d37ae36c
