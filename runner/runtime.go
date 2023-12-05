@@ -81,6 +81,13 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	}
 
 	if rt.router != nil {
+		if rt.JWKS != nil {
+			rt.router.AuthFunc = jwtauth.JWKSAuthFunc(rt.JWKS)
+			// JWKS doesn't count as doint something without a router
+			eg.Go(func() error {
+				return rt.JWKS.Run(ctx)
+			})
+		}
 		// TODO: CORS
 		// TODO: Metrics
 
