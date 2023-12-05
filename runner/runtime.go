@@ -58,13 +58,6 @@ func (rt *Runtime) Run(ctx context.Context) error {
 
 	didAnything := false
 
-	if rt.JWKS != nil {
-		// JWKS doesn't count as doint something without a router
-		eg.Go(func() error {
-			return rt.JWKS.Run(ctx)
-		})
-	}
-
 	for _, uri := range rt.outboxURIs {
 		didAnything = true
 		uri := uri
@@ -81,6 +74,13 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	}
 
 	if rt.router != nil {
+		if rt.JWKS != nil {
+			rt.router.AuthFunc = jwtauth.JWKSAuthFunc(rt.JWKS)
+			// JWKS doesn't count as doint something without a router
+			eg.Go(func() error {
+				return rt.JWKS.Run(ctx)
+			})
+		}
 		// TODO: CORS
 		// TODO: Metrics
 
@@ -161,7 +161,6 @@ func (rt *Runtime) AddJWKS(ctx context.Context, sources ...string) error {
 		return err
 	}
 
-	rt.router.AuthFunc = jwtauth.JWKSAuthFunc(jwksManager)
 	rt.JWKS = jwksManager
 	return nil
 }
