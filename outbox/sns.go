@@ -132,6 +132,7 @@ func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*
 			TopicArn:                   aws.String(dest),
 		})
 		if err != nil {
+			log.WithError(ctx, err).Error("Failed to send batch")
 			return err
 		}
 		if len(out.Failed) > 0 {

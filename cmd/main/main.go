@@ -73,7 +73,7 @@ func run(ctx context.Context, envConfig EnvConfig) error {
 
 	if envConfig.PostgresOutboxURI != "" || envConfig.SQSURL != "" {
 		if envConfig.SNSPrefix == "" {
-			return fmt.Errorf("SNS prefix required when using Postgres outbox")
+			return fmt.Errorf("SNS prefix required when using Postgres outbox or subscribing to SQS")
 		}
 		rt.Sender = outbox.NewSNSBatcher(sns.NewFromConfig(awsConfig), envConfig.SNSPrefix)
 	}

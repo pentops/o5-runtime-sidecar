@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/jwtauth/jwks"
@@ -51,25 +52,49 @@ func (rt *Runtime) Close() error {
 	return nil
 }
 
+type LoggingEG struct {
+	*errgroup.Group
+	waitingFor map[string]struct{}
+	mutex      sync.Mutex
+}
+
+func (eg *LoggingEG) Go(ctx context.Context, name string, f func(ctx context.Context) error) {
+	eg.waitingFor[name] = struct{}{}
+
+	eg.Group.Go(func() error {
+		ctx := log.WithField(ctx, "goroutine", name)
+		err := f(ctx)
+		if err != nil {
+			log.WithError(ctx, err).Error("Error in goroutine")
+		}
+		delete(eg.waitingFor, name)
+		eg.mutex.Lock()
+		waiting := make([]string, 0, len(eg.waitingFor))
+		for name := range eg.waitingFor {
+			waiting = append(waiting, name)
+		}
+		log.WithField(ctx, "waiting", waiting).Debug("Waiting for goroutines")
+		eg.mutex.Unlock()
+		return err
+	})
+}
+
 func (rt *Runtime) Run(ctx context.Context) error {
 	log.Debug(ctx, "Sidecar Running")
 	defer rt.Close()
-	eg, ctx := errgroup.WithContext(ctx)
+	rawEg, ctx := errgroup.WithContext(ctx)
+	eg := &LoggingEG{
+		Group:      rawEg,
+		waitingFor: map[string]struct{}{},
+	}
 
 	didAnything := false
 
 	for _, uri := range rt.outboxURIs {
 		didAnything = true
 		uri := uri
-		eg.Go(func() error {
+		eg.Go(ctx, "outbox", func(ctx context.Context) error {
 			return outbox.Listen(ctx, uri, rt.Sender)
-		})
-	}
-	if rt.router != nil && rt.JWKS != nil {
-		rt.router.AuthFunc = jwtauth.JWKSAuthFunc(rt.JWKS)
-		// JWKS doesn't count as doint something without a router
-		eg.Go(func() error {
-			return rt.JWKS.Run(ctx)
 		})
 	}
 
@@ -84,7 +109,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		if rt.JWKS != nil {
 			rt.router.AuthFunc = jwtauth.JWKSAuthFunc(rt.JWKS)
 			// JWKS doesn't count as doint something without a router
-			eg.Go(func() error {
+			eg.Go(ctx, "jwks", func(ctx context.Context) error {
 				return rt.JWKS.Run(ctx)
 			})
 		}
@@ -110,14 +135,14 @@ func (rt *Runtime) Run(ctx context.Context) error {
 			srv.Shutdown(ctx) // nolint:errcheck
 		}()
 
-		eg.Go(func() error {
+		eg.Go(ctx, "router", func(ctx context.Context) error {
 			return srv.ListenAndServe()
 		})
 	}
 
 	if rt.Worker != nil {
 		didAnything = true
-		eg.Go(func() error {
+		eg.Go(ctx, "worker", func(ctx context.Context) error {
 			return rt.Worker.Run(ctx)
 		})
 	}
@@ -126,7 +151,14 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		return fmt.Errorf("no services configured")
 	}
 
-	return eg.Wait()
+	if err := eg.Wait(); err != nil {
+		log.WithError(ctx, err).Error("Error in goroutines")
+		return err
+	}
+
+	log.Info(ctx, "Sidecar Stopped with no error")
+	return nil
+
 }
 
 func (rt *Runtime) AddRouter(port int, codecOptions jsonapi.Options) error {
