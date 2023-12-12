@@ -18,12 +18,21 @@ import (
 
 // FetchServices fetches the full reflection descriptor of all exposed services from a grpc server
 func FetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
+	return fetchServices(ctx, conn)
+}
+
+func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
+
+	client := grpc_reflection_v1.NewServerReflectionClient(conn)
+
+	var stream grpc_reflection_v1.ServerReflection_ServerReflectionInfoClient
 	for {
-		services, err := fetchServices(ctx, conn)
+		cc, err := client.ServerReflectionInfo(ctx)
 		if err == nil {
-			log.WithField(ctx, "services", len(services)).Info("fetched services")
-			return services, nil
+			stream = cc
+			break
 		}
+
 		log.WithError(ctx, err).Error("fetching services. Retrying")
 
 		if errors.Is(err, context.Canceled) {
@@ -36,22 +45,12 @@ func FetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.S
 			return nil, ctx.Err()
 		}
 	}
-}
-
-func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
-
-	client := grpc_reflection_v1.NewServerReflectionClient(conn)
-
-	cc, err := client.ServerReflectionInfo(ctx)
-	if err != nil {
-		return nil, err
-	}
 
 	roundTrip := func(req *grpc_reflection_v1.ServerReflectionRequest) (*grpc_reflection_v1.ServerReflectionResponse, error) {
-		if err := cc.Send(req); err != nil {
+		if err := stream.Send(req); err != nil {
 			return nil, err
 		}
-		return cc.Recv()
+		return stream.Recv()
 	}
 
 	resp, err := roundTrip(&grpc_reflection_v1.ServerReflectionRequest{
@@ -63,6 +62,8 @@ func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.S
 
 	ds := &descriptorpb.FileDescriptorSet{}
 	serviceNames := make([]string, 0)
+
+	fileSet := make(map[string]struct{})
 
 	for _, service := range resp.GetListServicesResponse().Service {
 		// don't register the reflection service
@@ -86,6 +87,10 @@ func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.S
 			if err := proto.Unmarshal(rawFile, file); err != nil {
 				return nil, err
 			}
+			if _, ok := fileSet[file.GetName()]; ok {
+				continue
+			}
+			fileSet[file.GetName()] = struct{}{}
 			ds.File = append(ds.File, file)
 		}
 	}
