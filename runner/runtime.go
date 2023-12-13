@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/jwtauth/jwks"
@@ -16,7 +15,7 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
-	"golang.org/x/sync/errgroup"
+	"github.com/pentops/runner"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -52,48 +51,19 @@ func (rt *Runtime) Close() error {
 	return nil
 }
 
-type LoggingEG struct {
-	*errgroup.Group
-	waitingFor map[string]struct{}
-	mutex      sync.Mutex
-}
-
-func (eg *LoggingEG) Go(ctx context.Context, name string, f func(ctx context.Context) error) {
-	eg.waitingFor[name] = struct{}{}
-
-	eg.Group.Go(func() error {
-		ctx := log.WithField(ctx, "goroutine", name)
-		err := f(ctx)
-		if err != nil {
-			log.WithError(ctx, err).Error("Error in goroutine")
-		}
-		delete(eg.waitingFor, name)
-		eg.mutex.Lock()
-		waiting := make([]string, 0, len(eg.waitingFor))
-		for name := range eg.waitingFor {
-			waiting = append(waiting, name)
-		}
-		log.WithField(ctx, "waiting", waiting).Debug("Waiting for goroutines")
-		eg.mutex.Unlock()
-		return err
-	})
-}
-
 func (rt *Runtime) Run(ctx context.Context) error {
 	log.Debug(ctx, "Sidecar Running")
 	defer rt.Close()
-	rawEg, ctx := errgroup.WithContext(ctx)
-	eg := &LoggingEG{
-		Group:      rawEg,
-		waitingFor: map[string]struct{}{},
-	}
+
+	runGroup := runner.NewGroup()
+	runGroup.Name = "runtime"
 
 	didAnything := false
 
 	for _, uri := range rt.outboxURIs {
 		didAnything = true
 		uri := uri
-		eg.Go(ctx, "outbox", func(ctx context.Context) error {
+		runGroup.Add("outbox", func(ctx context.Context) error {
 			return outbox.Listen(ctx, uri, rt.Sender)
 		})
 	}
@@ -109,7 +79,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		if rt.JWKS != nil {
 			rt.router.AuthFunc = jwtauth.JWKSAuthFunc(rt.JWKS)
 			// JWKS doesn't count as doint something without a router
-			eg.Go(ctx, "jwks", func(ctx context.Context) error {
+			runGroup.Add("jwks", func(ctx context.Context) error {
 				return rt.JWKS.Run(ctx)
 			})
 		}
@@ -135,14 +105,14 @@ func (rt *Runtime) Run(ctx context.Context) error {
 			srv.Shutdown(ctx) // nolint:errcheck
 		}()
 
-		eg.Go(ctx, "router", func(ctx context.Context) error {
+		runGroup.Add("router", func(ctx context.Context) error {
 			return srv.ListenAndServe()
 		})
 	}
 
 	if rt.Worker != nil {
 		didAnything = true
-		eg.Go(ctx, "worker", func(ctx context.Context) error {
+		runGroup.Add("worker", func(ctx context.Context) error {
 			return rt.Worker.Run(ctx)
 		})
 	}
@@ -151,7 +121,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		return fmt.Errorf("no services configured")
 	}
 
-	if err := eg.Wait(); err != nil {
+	if err := runGroup.Run(ctx); err != nil {
 		log.WithError(ctx, err).Error("Error in goroutines")
 		return err
 	}

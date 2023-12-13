@@ -14,7 +14,6 @@ type Service struct {
 }
 
 func TestProtoReadHappy(t *testing.T) {
-	ctx := context.Background()
 
 	grpcPair := flowtest.NewGRPCPair(t)
 
@@ -22,4 +21,23 @@ func TestProtoReadHappy(t *testing.T) {
 	testpb.RegisterFooServiceServer(grpcPair.Server, service)
 	reflection.Register(grpcPair.Server)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	grpcPair.ServeUntilDone(t, ctx)
+
+	desc, err := FetchServices(ctx, grpcPair.Client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Log(desc)
+
+	if len(desc) != 1 {
+		t.Fatal("expected one service")
+	}
+
+	if desc[0].Name() != "FooService" {
+		t.Fatal("expected FooService")
+	}
 }
