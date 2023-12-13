@@ -55,8 +55,10 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	log.Debug(ctx, "Sidecar Running")
 	defer rt.Close()
 
-	runGroup := runner.NewGroup()
-	runGroup.Name = "runtime"
+	runGroup := runner.NewGroup(
+		runner.WithName("runtime"),
+		runner.WithCancelOnSignals(),
+	)
 
 	didAnything := false
 
@@ -68,6 +70,10 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		})
 	}
 
+	if rt.router != nil && rt.JWKS != nil {
+		rt.router.AuthFunc = jwtauth.JWKSAuthFunc(rt.JWKS)
+	}
+
 	for _, endpoint := range rt.endpoints {
 		endpoint := endpoint
 		if err := rt.registerEndpoint(ctx, endpoint); err != nil {
@@ -76,13 +82,6 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	}
 
 	if rt.router != nil {
-		if rt.JWKS != nil {
-			rt.router.AuthFunc = jwtauth.JWKSAuthFunc(rt.JWKS)
-			// JWKS doesn't count as doint something without a router
-			runGroup.Add("jwks", func(ctx context.Context) error {
-				return rt.JWKS.Run(ctx)
-			})
-		}
 		// TODO: CORS
 		// TODO: Metrics
 
@@ -94,18 +93,23 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		}
 
 		if rt.JWKS != nil {
+			runGroup.Add("jwks", rt.JWKS.Run)
 			// Wait for keys to be loaded before starting the server
-			if err := rt.JWKS.WaitForKeys(ctx); err != nil {
-				return fmt.Errorf("failed to load JWKS: %w", err)
-			}
 		}
 
 		go func() {
 			<-ctx.Done()
-			srv.Shutdown(ctx) // nolint:errcheck
+			if err := srv.Shutdown(ctx); err != nil {
+				log.WithError(ctx, err).Error("Error shutting down server")
+			}
 		}()
 
 		runGroup.Add("router", func(ctx context.Context) error {
+			if rt.JWKS != nil {
+				if err := rt.JWKS.WaitForKeys(ctx); err != nil {
+					return fmt.Errorf("failed to load JWKS: %w", err)
+				}
+			}
 			return srv.ListenAndServe()
 		})
 	}

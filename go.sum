@@ -102,8 +102,8 @@ github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576 h1:A/vY7Qiv1S/1mUta
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
 github.com/pentops/o5-go v0.0.0-20231130065829-e542d37ae36c h1:g6s5MgPisc9jO82gSuYAKMmlqtqvTjeVaWj6oplACy8=
 github.com/pentops/o5-go v0.0.0-20231130065829-e542d37ae36c/go.mod h1:O+4h8TLk1cKGt/xDX1ThMg57ppoQXXPhxs57fxQK2ZE=
-github.com/pentops/runner v0.0.0-20231213035841-aa3959800a1b h1:nFmD0GEmSR99/ZObQjzD0L8JI44+NOltkCIoulZhG1o=
-github.com/pentops/runner v0.0.0-20231213035841-aa3959800a1b/go.mod h1:WSA32DlyDDEahNuv5XZP6ymsfKKLTHWVgMLlXsgyF7Y=
+github.com/pentops/runner v0.0.0-20231213060601-530e254b05de h1:LqmIPYzQQNKK/zH8hHjWRjFNWg2RCPu7DJQdxDlfqj8=
+github.com/pentops/runner v0.0.0-20231213060601-530e254b05de/go.mod h1:WSA32DlyDDEahNuv5XZP6ymsfKKLTHWVgMLlXsgyF7Y=
 github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5 h1:09bSwWuVlJ2ac3caVja4LBLhywvs6Rhev7uijnBzyAs=
 github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5/go.mod h1:8ggrY3eTtY+8xMOge3jXeMQTCe59lr3Hmi/H5PRNEL0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
