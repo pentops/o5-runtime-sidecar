@@ -225,7 +225,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error 
 	for _, ss := range services {
 		name := string(ss.FullName())
 		switch {
-		case strings.HasSuffix(name, "Service"):
+		case strings.HasSuffix(name, "Service"), strings.HasSuffix(name, "Sandbox"):
 			if rt.router == nil {
 				return fmt.Errorf("service %s requires a public port", name)
 			}
