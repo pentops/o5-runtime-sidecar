@@ -17,12 +17,12 @@ require (
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
 	github.com/pentops/o5-go v0.0.0-20231214002616-3606f30b91ad
 	github.com/pentops/runner v0.0.0-20231214005459-03b98c71894f
+	github.com/pentops/sqrlx.go v0.0.0-20231212035131-ba083cf9eeb0
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/genproto/googleapis/api v0.0.0-20231127180814-3a041ad873d4
 	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.1-0.20231027082548-f4a6c1f6e5c1
 	gopkg.daemonl.com/envconf v0.0.0-20220909014755-d65ec77bd452
-	gopkg.daemonl.com/sqrlx v0.0.25
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 

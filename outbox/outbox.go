@@ -9,7 +9,7 @@ import (
 	sq "github.com/elgris/sqrl"
 	"github.com/lib/pq"
 	"github.com/pentops/log.go/log"
-	"gopkg.daemonl.com/sqrlx"
+	"github.com/pentops/sqrlx.go/sqrlx"
 )
 
 type Message struct {
