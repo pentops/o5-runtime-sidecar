@@ -42,8 +42,16 @@ type Router struct {
 }
 
 func NewRouter(codecOptions jsonapi.Options) *Router {
+	router := mux.NewRouter()
+
+	router.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error":"not found"}` + "\n")) // nolint: errcheck
+		log.WithField(r.Context(), "httpURL", r.URL.String()).Debug("Not found")
+	})
+
 	return &Router{
-		router: mux.NewRouter(),
+		router: router,
 		ForwardResponseHeaders: map[string]bool{
 			"set-cookie": true,
 			"x-version":  true,
@@ -77,23 +85,28 @@ func (rr *Router) StaticJSON(path string, document interface{}) error {
 	return nil
 }
 
-func (rr *Router) RegisterService(ss protoreflect.ServiceDescriptor, conn Invoker) error {
+func (rr *Router) RegisterService(ctx context.Context, ss protoreflect.ServiceDescriptor, conn Invoker) error {
 	methods := ss.Methods()
 	for ii := 0; ii < methods.Len(); ii++ {
 		method := methods.Get(ii)
-		if err := rr.registerMethod(method, conn); err != nil {
+		if err := rr.registerMethod(ctx, method, conn); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (rr *Router) registerMethod(method protoreflect.MethodDescriptor, conn Invoker) error {
+func (rr *Router) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, conn Invoker) error {
 	handler, err := rr.buildMethod(method, conn)
 	if err != nil {
 		return err
 	}
 	rr.router.Methods(handler.HTTPMethod).Path(handler.HTTPPath).Handler(handler)
+	log.WithFields(ctx, map[string]interface{}{
+		"method": handler.HTTPMethod,
+		"path":   handler.HTTPPath,
+		"grpc":   handler.FullName,
+	}).Info("Registered HTTP Method")
 	return nil
 }
 

@@ -93,7 +93,7 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 		invoker:        invoker,
 	}
 
-	log.WithField(ctx, "service", ss.fullName).Debug("Registering service")
+	log.WithField(ctx, "service", ss.fullName).Info("Registering Worker Service")
 
 	if ss.fullName == RawMessageName {
 		ss.customParser = func(b []byte) (proto.Message, error) {

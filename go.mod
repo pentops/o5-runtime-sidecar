@@ -15,8 +15,8 @@ require (
 	github.com/pentops/jsonapi v0.0.0-20231213035817-fca84e684305
 	github.com/pentops/jwtauth v0.0.0-20231205014011-d7e6a902638d
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
-	github.com/pentops/o5-go v0.0.0-20231130065829-e542d37ae36c
-	github.com/pentops/runner v0.0.0-20231213060601-530e254b05de
+	github.com/pentops/o5-go v0.0.0-20231214002616-3606f30b91ad
+	github.com/pentops/runner v0.0.0-20231214005459-03b98c71894f
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/genproto/googleapis/api v0.0.0-20231127180814-3a041ad873d4
 	google.golang.org/grpc v1.59.0

@@ -203,7 +203,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error 
 			if rt.router == nil {
 				return fmt.Errorf("service %s requires a public port", name)
 			}
-			if err := rt.router.RegisterService(ss, conn); err != nil {
+			if err := rt.router.RegisterService(ctx, ss, conn); err != nil {
 				return fmt.Errorf("register service %s: %w", name, err)
 			}
 			rt.httpServices = append(rt.httpServices, ss)
