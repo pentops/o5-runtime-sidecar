@@ -14,6 +14,7 @@ import (
 
 type JWKS interface {
 	GetKeys(keyID string) ([]jose.JSONWebKey, error)
+	KeyDebug() interface{}
 }
 
 const (
@@ -62,6 +63,12 @@ func JWKSAuthFunc(jwks JWKS) proxy.AuthFunc {
 			return nil, status.Error(codes.Unauthenticated, err.Error())
 		}
 		if len(keys) != 1 {
+			keyDebug := jwks.KeyDebug()
+			log.WithFields(ctx, map[string]interface{}{
+				"presentedKeyID": keyID,
+				"foundKeys":      len(keys),
+				"keys":           keyDebug,
+			}).Error("invalid number of keys returned")
 			return nil, status.Error(codes.Unauthenticated, NoTrustedKeyMessage)
 		}
 

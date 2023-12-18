@@ -93,8 +93,8 @@ github.com/pentops/flowtest v0.0.0-20231208213652-010393b9641f h1:s2FfU30jH9A0rS
 github.com/pentops/flowtest v0.0.0-20231208213652-010393b9641f/go.mod h1:FNquTq/mafLEDD+w/yiiQKIuAuQycFD9zhZ+pbAivc0=
 github.com/pentops/jsonapi v0.0.0-20231213035817-fca84e684305 h1:0kUYQf8jH6wtXYrP08KH64oMfn1eTFvD73fpz80bfrA=
 github.com/pentops/jsonapi v0.0.0-20231213035817-fca84e684305/go.mod h1:8iA9Ifg+d99rf40DNQlypq8sNKZFsAzPcLG7yFJJTUY=
-github.com/pentops/jwtauth v0.0.0-20231205014011-d7e6a902638d h1:QxriSEKvnedaZKtv0UcgPz8VTTlE+l/hOQYHQOUv/gA=
-github.com/pentops/jwtauth v0.0.0-20231205014011-d7e6a902638d/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
+github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc h1:UWIkLLWXVoUmRxIZtQiQpeKGXXt25ooSLwt9z4ov12s=
+github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576 h1:A/vY7Qiv1S/1mUtacZQVoXicaYiiaSR7PInSUcaMOpA=
 github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
 github.com/pentops/o5-go v0.0.0-20231214002616-3606f30b91ad h1:Er3/fTBbcT8dK6zRa8sg14CuDBKnbdJAKZFnuDr43dM=

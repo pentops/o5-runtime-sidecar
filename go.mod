@@ -13,7 +13,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pentops/flowtest v0.0.0-20231208213652-010393b9641f
 	github.com/pentops/jsonapi v0.0.0-20231213035817-fca84e684305
-	github.com/pentops/jwtauth v0.0.0-20231205014011-d7e6a902638d
+	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
 	github.com/pentops/o5-go v0.0.0-20231214002616-3606f30b91ad
 	github.com/pentops/runner v0.0.0-20231214022424-be1b096d4cf0
