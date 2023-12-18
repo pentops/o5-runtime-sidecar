@@ -23,6 +23,10 @@ type testJWKS struct {
 	keys []jose.JSONWebKey
 }
 
+func (tj *testJWKS) KeyDebug() interface{} {
+	return tj.keys
+}
+
 func sign(t testing.TB, privateKey *jose.JSONWebKey, claims *jwt.Claims) string {
 	signer, err := jose.NewSigner(
 		jose.SigningKey{
