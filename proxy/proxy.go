@@ -12,6 +12,7 @@ import (
 	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/auth/v1/auth_pb"
+	"github.com/rs/cors"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -37,6 +38,8 @@ type Router struct {
 	ForwardResponseHeaders map[string]bool
 	ForwardRequestHeaders  map[string]bool
 	CodecOptions           jsonapi.Options
+
+	middleware []func(http.Handler) http.Handler
 
 	AuthFunc AuthFunc
 }
@@ -64,12 +67,24 @@ func NewRouter(codecOptions jsonapi.Options) *Router {
 	}
 }
 
+func (rr *Router) Use(middleware func(http.Handler) http.Handler) {
+	rr.middleware = append(rr.middleware, middleware)
+}
+
+func (rr *Router) UseCORS(config cors.Options) {
+	rr.Use(cors.New(config).Handler)
+}
+
 func (rr *Router) SetNotFoundHandler(handler http.Handler) {
 	rr.router.NotFoundHandler = handler
 }
 
 func (rr *Router) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	rr.router.ServeHTTP(w, r)
+	var handler http.Handler = rr.router
+	for _, mw := range rr.middleware {
+		handler = mw(handler)
+	}
+	handler.ServeHTTP(w, r)
 }
 
 func (rr *Router) StaticJSON(path string, document interface{}) error {

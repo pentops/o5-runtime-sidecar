@@ -18,6 +18,7 @@ require (
 	github.com/pentops/o5-go v0.0.0-20231215223145-fbf3637a149d
 	github.com/pentops/runner v0.0.0-20231214022424-be1b096d4cf0
 	github.com/pentops/sqrlx.go v0.0.0-20231212035131-ba083cf9eeb0
+	github.com/rs/cors v1.10.1
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/genproto/googleapis/api v0.0.0-20231127180814-3a041ad873d4
 	google.golang.org/grpc v1.59.0
