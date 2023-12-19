@@ -1,4 +1,4 @@
-package runner
+package entrypoint
 
 import (
 	"context"
@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sns"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
@@ -16,10 +19,92 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/pentops/runner"
+	"github.com/rs/cors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
+
+type Config struct {
+	PublicPort  int      `env:"PUBLIC_PORT" default:"0"`
+	Service     []string `env:"SERVICE_ENDPOINT" default:""`
+	StaticFiles string   `env:"STATIC_FILES" default:""`
+	SQSURL      string   `env:"SQS_URL" default:""`
+
+	PostgresOutboxURI string `env:"POSTGRES_OUTBOX" default:""`
+	SNSPrefix         string `env:"SNS_PREFIX" default:""`
+
+	CORSOrigins []string `env:"CORS_ORIGINS" default:""`
+
+	JWKS []string `env:"JWKS" default:""`
+}
+
+func FromConfig(envConfig Config, awsConfig aws.Config) (*Runtime, error) {
+
+	rt := NewRuntime()
+
+	if envConfig.PostgresOutboxURI != "" || envConfig.SQSURL != "" {
+		if envConfig.SNSPrefix == "" {
+			return nil, fmt.Errorf("SNS prefix required when using Postgres outbox or subscribing to SQS")
+		}
+		rt.Sender = outbox.NewSNSBatcher(sns.NewFromConfig(awsConfig), envConfig.SNSPrefix)
+	}
+
+	if envConfig.PostgresOutboxURI != "" {
+		if err := rt.AddOutbox(envConfig.PostgresOutboxURI); err != nil {
+			return nil, fmt.Errorf("add outbox: %w", err)
+		}
+	}
+
+	if envConfig.SQSURL != "" {
+		sqsClient := sqs.NewFromConfig(awsConfig)
+		rt.Worker = sqslink.NewWorker(sqsClient, envConfig.SQSURL, rt.Sender)
+	}
+
+	if envConfig.PublicPort != 0 {
+		codecOptions := jsonapi.Options{
+			ShortEnums: &jsonapi.ShortEnumsOption{
+				UnspecifiedSuffix: "UNSPECIFIED",
+				StrictUnmarshal:   true,
+			},
+			WrapOneof: true,
+		}
+
+		router := proxy.NewRouter(codecOptions)
+		if len(envConfig.CORSOrigins) > 0 {
+			router.UseCORS(cors.Options{
+				AllowedOrigins:   envConfig.CORSOrigins,
+				AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+				AllowedHeaders:   []string{"*"},
+				AllowCredentials: true,
+			})
+		}
+
+		if err := rt.AddRouter(envConfig.PublicPort, router); err != nil {
+			return nil, fmt.Errorf("add router: %w", err)
+		}
+	}
+
+	if envConfig.StaticFiles != "" {
+		if err := rt.StaticFiles(envConfig.StaticFiles); err != nil {
+			return nil, fmt.Errorf("static files: %w", err)
+		}
+	}
+
+	if len(envConfig.JWKS) > 0 {
+		if err := rt.AddJWKS(envConfig.JWKS...); err != nil {
+			return nil, fmt.Errorf("add JWKS: %w", err)
+		}
+	}
+
+	for _, endpoint := range envConfig.Service {
+		if err := rt.AddEndpoint(endpoint); err != nil {
+			return nil, fmt.Errorf("add endpoint %s: %w", endpoint, err)
+		}
+	}
+
+	return rt, nil
+}
 
 type Runtime struct {
 	router     *proxy.Router
@@ -135,17 +220,17 @@ func (rt *Runtime) Run(ctx context.Context) error {
 
 }
 
-func (rt *Runtime) AddRouter(port int, codecOptions jsonapi.Options) error {
+func (rt *Runtime) AddRouter(port int, router *proxy.Router) error {
 	if rt.router != nil {
 		return fmt.Errorf("router already configured")
 	}
 
-	rt.router = proxy.NewRouter(codecOptions)
+	rt.router = router
 	rt.PublicPort = port
 	return nil
 }
 
-func (rt *Runtime) AddOutbox(ctx context.Context, outboxURI string) error {
+func (rt *Runtime) AddOutbox(outboxURI string) error {
 	if rt.Sender == nil {
 		return fmt.Errorf("outbox requires a sender")
 	}
@@ -163,12 +248,8 @@ func (rt *Runtime) StaticFiles(dirname string) error {
 	return nil
 }
 
-func (rt *Runtime) AddJWKS(ctx context.Context, sources ...string) error {
+func (rt *Runtime) AddJWKS(sources ...string) error {
 	jwksManager := jwks.NewKeyManager()
-
-	for _, source := range sources {
-		log.WithField(ctx, "source", source).Info("Adding JWKS source URL")
-	}
 
 	if err := jwksManager.AddSourceURLs(sources...); err != nil {
 		return err
@@ -178,7 +259,7 @@ func (rt *Runtime) AddJWKS(ctx context.Context, sources ...string) error {
 	return nil
 }
 
-func (rt *Runtime) AddEndpoint(ctx context.Context, endpoint string) error {
+func (rt *Runtime) AddEndpoint(endpoint string) error {
 	rt.endpoints = append(rt.endpoints, endpoint)
 	return nil
 }

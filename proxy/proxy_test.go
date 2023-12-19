@@ -13,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb"
+	"github.com/rs/cors"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
@@ -24,6 +25,42 @@ var testCodecOptions = jsonapi.Options{
 		StrictUnmarshal:   true,
 	},
 	WrapOneof: true,
+}
+
+func TestCORS(t *testing.T) {
+	ctx := context.Background()
+	rr := NewRouter(testCodecOptions)
+
+	rr.UseCORS(cors.Options{
+		AllowedOrigins:   []string{"https://*.example.com"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	})
+
+	if err := rr.RegisterService(ctx, testpb.File_test_v1_test_proto.Services().Get(0),
+		TestInvoker[
+			*testpb.GetFooRequest,
+			*testpb.GetFooResponse,
+		](func(req *testpb.GetFooRequest) (*testpb.GetFooResponse, error) {
+			return &testpb.GetFooResponse{}, nil
+		})); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("OPTIONS", "/test/v1/foo/idVal", nil)
+	req.Header.Set("Origin", "https://sub.example.com")
+	req.Header.Set("Access-Control-Request-Method", "GET")
+	req.Header.Set("Access-Control-Request-Headers", "X-Custom-Header")
+	rw := httptest.NewRecorder()
+	rr.ServeHTTP(rw, req)
+	rw.Flush()
+
+	assert.Equal(t, http.StatusNoContent, rw.Code)
+	assert.Equal(t, "https://sub.example.com", rw.Header().Get("Access-Control-Allow-Origin"))
+	assert.Equal(t, "GET", rw.Header().Get("Access-Control-Allow-Methods"))
+	assert.Equal(t, "X-Custom-Header", rw.Header().Get("Access-Control-Allow-Headers"))
+
 }
 
 func TestGetHandlerMapping(t *testing.T) {
@@ -108,7 +145,31 @@ func TestBodyHandlerMapping(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+}
 
+type TestInvoker[REQ proto.Message, RES proto.Message] func(req REQ) (RES, error)
+
+func (fn TestInvoker[REQ, RES]) Invoke(ctx context.Context, method string, protoReq, protoRes interface{}, opts ...grpc.CallOption) error {
+	protoInvokeRequest, ok := protoReq.(REQ)
+	if !ok {
+		return fmt.Errorf("expected proto.Message, got %T", protoReq)
+	}
+
+	protoInvokeResponse, ok := protoRes.(RES)
+	if !ok {
+		return fmt.Errorf("expected proto.Message, got %T", protoRes)
+	}
+
+	gotRes, err := fn(protoInvokeRequest)
+	if err != nil {
+		return err
+	}
+
+	// Copy the passed in gRPC PRoto response to the HTTP Response mapper
+	if err := protoCopy(protoInvokeResponse, gotRes); err != nil {
+		return err
+	}
+	return nil
 }
 
 func protoCopy(from, to proto.Message) error {
