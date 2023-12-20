@@ -4,9 +4,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strconv"
+	"strings"
 
+	"github.com/pentops/jsonapi/jsonapi"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 func int32Mapper(fd protoreflect.FieldDescriptor, s string) (protoreflect.Value, error) {
@@ -96,7 +99,17 @@ var mappersFromString = map[protoreflect.Kind]mapperFromString{
 	},
 }
 
-func setFieldFromString(inputMessage *dynamicpb.Message, fd protoreflect.FieldDescriptor, provided string) error {
+func setFieldFromString(codec jsonapi.Options, inputMessage protoreflect.Message, fd protoreflect.FieldDescriptor, provided string) error {
+
+	if fd.Kind() == protoreflect.MessageKind {
+		msg := inputMessage.NewField(fd).Message()
+		if err := jsonapi.Decode(codec, []byte(provided), msg); err != nil {
+			return err
+		}
+		inputMessage.Set(fd, protoreflect.ValueOfMessage(msg))
+		return nil
+	}
+
 	tc, ok := mappersFromString[fd.Kind()]
 	if !ok {
 		return fmt.Errorf("unsupported field type %s", fd.Kind())
@@ -111,13 +124,36 @@ func setFieldFromString(inputMessage *dynamicpb.Message, fd protoreflect.FieldDe
 	return nil
 }
 
-func setFieldFromStrings(inputMessage *dynamicpb.Message, fd protoreflect.FieldDescriptor, provided []string) error {
+func setFieldFromStrings(codec jsonapi.Options, inputMessage protoreflect.Message, key string, provided []string) error {
+
+	parts := strings.SplitN(key, ".", 2)
+	if len(parts) > 1 {
+		fd := inputMessage.Descriptor().Fields().ByName(protoreflect.Name(parts[0]))
+		if fd == nil {
+			return status.Error(codes.InvalidArgument, fmt.Sprintf("unknown obj query parameter %q", parts[0]))
+		}
+		if fd.Kind() != protoreflect.MessageKind {
+			return status.Error(codes.InvalidArgument, fmt.Sprintf("unknown query parameter %q (%q is not an object)", parts, parts[0]))
+		}
+
+		if !inputMessage.Has(fd) {
+			msgVal := inputMessage.NewField(fd)
+			inputMessage.Set(fd, msgVal)
+		}
+		msgVal := inputMessage.Get(fd).Message()
+		return setFieldFromStrings(codec, msgVal, parts[1], provided)
+	}
+
+	fd := inputMessage.Descriptor().Fields().ByName(protoreflect.Name(key))
+	if fd == nil {
+		return status.Error(codes.InvalidArgument, fmt.Sprintf("unknown query parameter %q", key))
+	}
 
 	if !fd.IsList() {
 		if len(provided) > 1 {
 			return fmt.Errorf("multiple values provided for non-repeated field %q", fd.Name())
 		}
-		return setFieldFromString(inputMessage, fd, provided[0])
+		return setFieldFromString(codec, inputMessage, fd, provided[0])
 	}
 
 	tc, ok := mappersFromString[fd.Kind()]
