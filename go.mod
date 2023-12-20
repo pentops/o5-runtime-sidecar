@@ -11,13 +11,13 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
-	github.com/pentops/flowtest v0.0.0-20231213175137-ac050902e7fb
-	github.com/pentops/jsonapi v0.0.0-20231214013117-a314a52e5b02
+	github.com/pentops/flowtest v0.0.0-20231220033746-7f2a56d8275b
+	github.com/pentops/jsonapi v0.0.0-20231220020413-ea22d9635572
 	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
-	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
+	github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4
 	github.com/pentops/o5-go v0.0.0-20231220062110-5d1223c7f9a0
-	github.com/pentops/runner v0.0.0-20231214022424-be1b096d4cf0
-	github.com/pentops/sqrlx.go v0.0.0-20231212035131-ba083cf9eeb0
+	github.com/pentops/runner v0.0.0-20231219070819-c4878d5565d8
+	github.com/pentops/sqrlx.go v0.0.0-20231220005743-34b51f632b38
 	github.com/rs/cors v1.10.1
 	github.com/stretchr/testify v1.8.4
 	google.golang.org/genproto/googleapis/api v0.0.0-20231127180814-3a041ad873d4
