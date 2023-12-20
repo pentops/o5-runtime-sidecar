@@ -15,7 +15,7 @@ require (
 	github.com/pentops/jsonapi v0.0.0-20231214013117-a314a52e5b02
 	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
 	github.com/pentops/log.go v0.0.0-20230815045424-6ebbd9ef2576
-	github.com/pentops/o5-go v0.0.0-20231215223145-fbf3637a149d
+	github.com/pentops/o5-go v0.0.0-20231220062110-5d1223c7f9a0
 	github.com/pentops/runner v0.0.0-20231214022424-be1b096d4cf0
 	github.com/pentops/sqrlx.go v0.0.0-20231212035131-ba083cf9eeb0
 	github.com/rs/cors v1.10.1

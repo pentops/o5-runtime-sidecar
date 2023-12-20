@@ -3,6 +3,7 @@ package sqslink
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -97,8 +98,17 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 
 	if ss.fullName == RawMessageName {
 		ss.customParser = func(b []byte) (proto.Message, error) {
+			snsMessage := &SNSMessageWrapper{}
+			err := json.Unmarshal(b, snsMessage)
+			if err != nil {
+				return &messaging_tpb.RawMessage{
+					Payload: b,
+				}, nil
+			}
+
 			return &messaging_tpb.RawMessage{
-				Payload: b,
+				Topic:   snsMessage.TopicArn,
+				Payload: snsMessage.Message,
 			}, nil
 		}
 	}
@@ -222,6 +232,13 @@ type Handler interface {
 	HandleMessage(context.Context, *Message) error
 }
 
+type SNSMessageWrapper struct {
+	Type      string `json:"Type"`
+	Message   []byte `json:"Message"`
+	MessageID string `json:"MessageId"`
+	TopicArn  string `json:"TopicArn"`
+}
+
 func (ss *service) parseMessageBody(contentType string, raw []byte) (proto.Message, error) {
 	if ss.customParser != nil {
 		return ss.customParser(raw)
@@ -232,6 +249,12 @@ func (ss *service) parseMessageBody(contentType string, raw []byte) (proto.Messa
 	if contentType == "" {
 		if raw[0] == '{' {
 			contentType = "application/json"
+			snsMessage := &SNSMessageWrapper{}
+			err := json.Unmarshal(raw, snsMessage)
+			if err == nil { // IF NO ERROR
+				raw = snsMessage.Message
+			}
+
 		} else {
 			contentType = "application/protobuf"
 		}
