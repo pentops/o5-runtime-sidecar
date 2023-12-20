@@ -222,15 +222,14 @@ func (mm *Method) mapRequest(r *http.Request) (protoreflect.Message, error) {
 	reqVars := mux.Vars(r)
 	for key, provided := range reqVars {
 		fd := mm.Input.Fields().ByName(protoreflect.Name(key))
-		if err := setFieldFromString(inputMessage, fd, provided); err != nil {
+		if err := setFieldFromString(mm.CodecOptions, inputMessage, fd, provided); err != nil {
 			return nil, err
 		}
 	}
 
 	query := r.URL.Query()
 	for key, values := range query {
-		fd := mm.Input.Fields().ByName(protoreflect.Name(key))
-		if err := setFieldFromStrings(inputMessage, fd, values); err != nil {
+		if err := setFieldFromStrings(mm.CodecOptions, inputMessage, key, values); err != nil {
 			return nil, err
 		}
 	}

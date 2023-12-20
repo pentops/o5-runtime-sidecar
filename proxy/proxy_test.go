@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -68,6 +69,7 @@ func TestGetHandlerMapping(t *testing.T) {
 	fd := testpb.File_test_v1_test_proto.Services().Get(0).Methods().Get(0)
 
 	rr := NewRouter(testCodecOptions)
+
 	method, err := rr.buildMethod(fd, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +109,33 @@ func TestGetHandlerMapping(t *testing.T) {
 		assert.Len(t, reqToService.Numbers, 2)
 		assert.Equal(t, float32(55), reqToService.Numbers[0])
 		assert.Equal(t, float32(56), reqToService.Numbers[1])
+	})
+
+	t.Run("MessageQueryString", func(t *testing.T) {
+		qs := url.Values{}
+		qs.Set("query", `{"a":"aval","b":"bval"}`)
+		req := httptest.NewRequest("GET", "/test/v1/foo/idVal?"+qs.Encode(), nil)
+		reqToService := &testpb.GetFooRequest{}
+		rw := roundTrip(method, req, reqToService, &testpb.GetFooResponse{})
+		if rw.Code != 200 {
+			t.Fatalf("expected status code 200, got %d: %s", rw.Code, rw.Body.String())
+		}
+		assert.Equal(t, "aval", reqToService.Query.A)
+		assert.Equal(t, "bval", reqToService.Query.B)
+	})
+
+	t.Run("AltQueryString", func(t *testing.T) {
+		qs := url.Values{}
+		qs.Set("query.a", "aval")
+		qs.Set("query.b", "bval")
+		req := httptest.NewRequest("GET", "/test/v1/foo/idVal?"+qs.Encode(), nil)
+		reqToService := &testpb.GetFooRequest{}
+		rw := roundTrip(method, req, reqToService, &testpb.GetFooResponse{})
+		if rw.Code != 200 {
+			t.Fatalf("expected status code 200, got %d: %s", rw.Code, rw.Body.String())
+		}
+		assert.Equal(t, "aval", reqToService.Query.A)
+		assert.Equal(t, "bval", reqToService.Query.B)
 	})
 
 }
