@@ -124,11 +124,27 @@ func setFieldFromString(codec jsonapi.Options, inputMessage protoreflect.Message
 	return nil
 }
 
+func getField(descriptor protoreflect.MessageDescriptor, name string) protoreflect.FieldDescriptor {
+	fd := descriptor.Fields().ByJSONName(name)
+	if fd != nil {
+		return fd
+	}
+
+	fd = descriptor.Fields().ByName(protoreflect.Name(name))
+	if fd != nil {
+		return fd
+	}
+
+	return nil
+}
+
 func setFieldFromStrings(codec jsonapi.Options, inputMessage protoreflect.Message, key string, provided []string) error {
+
+	descriptor := inputMessage.Descriptor()
 
 	parts := strings.SplitN(key, ".", 2)
 	if len(parts) > 1 {
-		fd := inputMessage.Descriptor().Fields().ByName(protoreflect.Name(parts[0]))
+		fd := getField(descriptor, parts[0])
 		if fd == nil {
 			return status.Error(codes.InvalidArgument, fmt.Sprintf("unknown obj query parameter %q", parts[0]))
 		}
@@ -144,7 +160,7 @@ func setFieldFromStrings(codec jsonapi.Options, inputMessage protoreflect.Messag
 		return setFieldFromStrings(codec, msgVal, parts[1], provided)
 	}
 
-	fd := inputMessage.Descriptor().Fields().ByName(protoreflect.Name(key))
+	fd := getField(descriptor, key)
 	if fd == nil {
 		return status.Error(codes.InvalidArgument, fmt.Sprintf("unknown query parameter %q", key))
 	}

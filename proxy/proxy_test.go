@@ -138,6 +138,30 @@ func TestGetHandlerMapping(t *testing.T) {
 		assert.Equal(t, "bval", reqToService.Query.B)
 	})
 
+	t.Run("lower_snake query", func(t *testing.T) {
+		qs := url.Values{}
+		qs.Set("multiple_word", "aval")
+		req := httptest.NewRequest("GET", "/test/v1/foo/idVal?"+qs.Encode(), nil)
+		reqToService := &testpb.GetFooRequest{}
+		rw := roundTrip(method, req, reqToService, &testpb.GetFooResponse{})
+		if rw.Code != 200 {
+			t.Fatalf("expected status code 200, got %d: %s", rw.Code, rw.Body.String())
+		}
+		assert.Equal(t, "aval", reqToService.MultipleWord)
+	})
+
+	t.Run("camelCase query", func(t *testing.T) {
+		qs := url.Values{}
+		qs.Set("multipleWord", "aval")
+		req := httptest.NewRequest("GET", "/test/v1/foo/idVal?"+qs.Encode(), nil)
+		reqToService := &testpb.GetFooRequest{}
+		rw := roundTrip(method, req, reqToService, &testpb.GetFooResponse{})
+		if rw.Code != 200 {
+			t.Fatalf("expected status code 200, got %d: %s", rw.Code, rw.Body.String())
+		}
+		assert.Equal(t, "aval", reqToService.MultipleWord)
+	})
+
 }
 
 func TestBodyHandlerMapping(t *testing.T) {
