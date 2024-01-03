@@ -97,8 +97,10 @@ github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc h1:UWIkLLWXVoUmRxI
 github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
 github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4 h1:7kPDmBAQxMxcFIYt1rEco/AipZmm1CUoND3wSDmIOeI=
 github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
-github.com/pentops/o5-go v0.0.0-20231220062110-5d1223c7f9a0 h1:Rsi8q03eAAYzfehZ/49oF/86CwBAs5VVbYIT5VqfNZU=
-github.com/pentops/o5-go v0.0.0-20231220062110-5d1223c7f9a0/go.mod h1:O+4h8TLk1cKGt/xDX1ThMg57ppoQXXPhxs57fxQK2ZE=
+github.com/pentops/o5-go v0.0.0-20240103191826-234a4df7c841 h1:m4B6EgTJeHQjFn23h3uWl+LXw3oRkSW8NzA4/DanWE4=
+github.com/pentops/o5-go v0.0.0-20240103191826-234a4df7c841/go.mod h1:O+4h8TLk1cKGt/xDX1ThMg57ppoQXXPhxs57fxQK2ZE=
+github.com/pentops/protostate v0.0.0-20231222015008-a77f48709d88 h1:p4o20iU8rwsO6Sjl2vc2ycvDJmkuSk7/mVtmgMNUxR0=
+github.com/pentops/protostate v0.0.0-20231222015008-a77f48709d88/go.mod h1:ZG8ywsBKIca32H+k5jXXPS6diuadEJ84Rh6+glVHc1M=
 github.com/pentops/runner v0.0.0-20231219070819-c4878d5565d8 h1:JdNw2okTAbqiKyNiqNkObs9am3Cbkw6zv09qBx07w+I=
 github.com/pentops/runner v0.0.0-20231219070819-c4878d5565d8/go.mod h1:WSA32DlyDDEahNuv5XZP6ymsfKKLTHWVgMLlXsgyF7Y=
 github.com/pentops/sqrlx.go v0.0.0-20231220005743-34b51f632b38 h1:rb9sAfA+or2IsoS8eqm+54fZIj7FM78oE5gXRvGH15w=
