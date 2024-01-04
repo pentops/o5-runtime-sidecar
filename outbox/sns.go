@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-go/dante/v1/dante_pb"
 	"github.com/pentops/o5-go/dante/v1/dante_tpb"
 	"google.golang.org/protobuf/proto"
 )
@@ -31,12 +30,8 @@ func NewSNSBatcher(client SNSAPI, prefix string) *SNSBatcher {
 	}
 }
 
-func (b *SNSBatcher) DeadLetter(ctx context.Context, message *dante_pb.DeadMessage) error {
-	outMessage := &dante_tpb.DeadMessage{
-		Dead: message,
-	}
-
-	protoBody, err := proto.Marshal(outMessage)
+func (b *SNSBatcher) DeadLetter(ctx context.Context, message *dante_tpb.DeadMessage) error {
+	protoBody, err := proto.Marshal(message)
 	if err != nil {
 		return err
 	}
@@ -44,7 +39,7 @@ func (b *SNSBatcher) DeadLetter(ctx context.Context, message *dante_pb.DeadMessa
 	encoded := base64.StdEncoding.EncodeToString(protoBody)
 
 	attributes := map[string]types.MessageAttributeValue{}
-	headers := outMessage.MessagingHeaders()
+	headers := message.MessagingHeaders()
 
 	for key, val := range headers {
 		if val == "" {
@@ -56,7 +51,7 @@ func (b *SNSBatcher) DeadLetter(ctx context.Context, message *dante_pb.DeadMessa
 		}
 	}
 
-	dest := b.prefix + outMessage.MessagingTopic()
+	dest := b.prefix + message.MessagingTopic()
 
 	_, err = b.client.Publish(ctx, &sns.PublishInput{
 		Message:           aws.String(encoded),

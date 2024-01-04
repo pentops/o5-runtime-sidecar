@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/dante/v1/dante_pb"
+	"github.com/pentops/o5-go/dante/v1/dante_tpb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -32,7 +33,7 @@ type SQSAPI interface {
 }
 
 type DeadLetterHandler interface {
-	DeadLetter(context.Context, *dante_pb.DeadMessage) error
+	DeadLetter(context.Context, *dante_tpb.DeadMessage) error
 }
 
 type Worker struct {
@@ -334,13 +335,13 @@ func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error
 		return fmt.Errorf("failed to marshal input message as JSON: %w", err)
 	}
 
-	deadMessage := &dante_pb.DeadMessage{
-		InfraMessageId:    msg.SQSMessageID,
-		MessageId:         msg.MessageID,
-		QueueName:         ww.QueueURL,
-		GrpcName:          msg.ServiceName,
-		RejectedTimestamp: timestamppb.Now(),
-		Problem: &dante_pb.DeadMessage_UnhandledError{
+	deadMessage := &dante_tpb.DeadMessage{
+		InfraMessageId: msg.SQSMessageID,
+		MessageId:      msg.MessageID,
+		QueueName:      ww.QueueURL,
+		GrpcName:       msg.ServiceName,
+		Timestamp:      timestamppb.Now(),
+		Problem: &dante_tpb.DeadMessage_UnhandledError{
 			UnhandledError: &dante_pb.UnhandledError{
 				Error: killError.Error(),
 			},
