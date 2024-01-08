@@ -341,9 +341,11 @@ func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error
 		QueueName:      ww.QueueURL,
 		GrpcName:       msg.ServiceName,
 		Timestamp:      timestamppb.Now(),
-		Problem: &dante_tpb.DeadMessage_UnhandledError{
-			UnhandledError: &dante_pb.UnhandledError{
-				Error: killError.Error(),
+		Problem: &dante_pb.Problem{
+			Type: &dante_pb.Problem_UnhandledError{
+				UnhandledError: &dante_pb.UnhandledError{
+					Error: killError.Error(),
+				},
 			},
 		},
 		Payload: &dante_pb.Any{
