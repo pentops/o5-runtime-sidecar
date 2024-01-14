@@ -9,7 +9,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-go/dante/v1/dante_tpb"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -30,18 +29,18 @@ func NewSNSBatcher(client SNSAPI, prefix string) *SNSBatcher {
 	}
 }
 
-func (b *SNSBatcher) DeadLetter(ctx context.Context, message *dante_tpb.DeadMessage) error {
-	protoBody, err := proto.Marshal(message)
-	if err != nil {
-		return err
-	}
+type MarshalledMessage struct {
+	Body    []byte
+	Headers map[string]string
+	Topic   string
+}
 
-	encoded := base64.StdEncoding.EncodeToString(protoBody)
+func (b *SNSBatcher) SendMarshalled(ctx context.Context, message MarshalledMessage) error {
 
+	encoded := base64.StdEncoding.EncodeToString(message.Body)
 	attributes := map[string]types.MessageAttributeValue{}
-	headers := message.MessagingHeaders()
 
-	for key, val := range headers {
+	for key, val := range message.Headers {
 		if val == "" {
 			continue
 		}
@@ -51,15 +50,35 @@ func (b *SNSBatcher) DeadLetter(ctx context.Context, message *dante_tpb.DeadMess
 		}
 	}
 
-	dest := b.prefix + message.MessagingTopic()
+	dest := b.prefix + message.Topic
 
-	_, err = b.client.Publish(ctx, &sns.PublishInput{
+	_, err := b.client.Publish(ctx, &sns.PublishInput{
 		Message:           aws.String(encoded),
 		MessageAttributes: attributes,
 		TopicArn:          aws.String(dest),
 	})
 
 	return err
+}
+
+type RoutableMessage interface {
+	MessagingTopic() string
+	MessagingHeaders() map[string]string
+	proto.Message
+}
+
+func (b *SNSBatcher) SendOne(ctx context.Context, message RoutableMessage) error {
+	protoBody, err := proto.Marshal(message)
+	if err != nil {
+		return err
+	}
+
+	return b.SendMarshalled(ctx, MarshalledMessage{
+		Body:    protoBody,
+		Headers: message.MessagingHeaders(),
+		Topic:   message.MessagingTopic(),
+	})
+
 }
 
 type snsMessage struct {

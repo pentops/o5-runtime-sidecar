@@ -97,8 +97,6 @@ github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc h1:UWIkLLWXVoUmRxI
 github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
 github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4 h1:7kPDmBAQxMxcFIYt1rEco/AipZmm1CUoND3wSDmIOeI=
 github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
-github.com/pentops/o5-go v0.0.0-20240108212127-807bf5c29410 h1:modR3GqNo1R0crr5HR9sY5YwIj8zpCcBGsc6mGAiVJY=
-github.com/pentops/o5-go v0.0.0-20240108212127-807bf5c29410/go.mod h1:4KcT008BEFvePOgJ0B5IijtuvhYmVWjr6k+Opuk9vcQ=
 github.com/pentops/protostate v0.0.0-20240105003357-a960043b46e7 h1:6Sw+1djkYY81ytXavPPnXwYnOnicQuSkmLmMZ83AB4E=
 github.com/pentops/protostate v0.0.0-20240105003357-a960043b46e7/go.mod h1:q3JaRdbi1HZ882KHSIne45h/DVwPC5I7GqCFn9BRp0Y=
 github.com/pentops/runner v0.0.0-20231219070819-c4878d5565d8 h1:JdNw2okTAbqiKyNiqNkObs9am3Cbkw6zv09qBx07w+I=

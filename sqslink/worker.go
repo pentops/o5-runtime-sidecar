@@ -14,6 +14,7 @@ import (
 	"github.com/pentops/o5-go/dante/v1/dante_pb"
 	"github.com/pentops/o5-go/dante/v1/dante_tpb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
+	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -33,7 +34,7 @@ type SQSAPI interface {
 }
 
 type DeadLetterHandler interface {
-	DeadLetter(context.Context, *dante_tpb.DeadMessage) error
+	SendOne(context.Context, outbox.RoutableMessage) error
 }
 
 type Worker struct {
@@ -353,7 +354,7 @@ func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error
 			Json:  string(inputJSON),
 		},
 	}
-	if err := ww.deadLetterHandler.DeadLetter(ctx, deadMessage); err != nil {
+	if err := ww.deadLetterHandler.SendOne(ctx, deadMessage); err != nil {
 		return err
 	}
 	return nil
