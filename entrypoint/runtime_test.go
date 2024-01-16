@@ -79,7 +79,7 @@ func TestLoadEverything(t *testing.T) {
 		exitErr <- err
 	}()
 
-	httpAddr := runtime.RouterServer.Addr()
+	httpAddr := runtime.routerServer.Addr()
 	t.Logf("HTTP Addr: %s", httpAddr)
 
 	t.Run("HTTP CORS", func(t *testing.T) {
@@ -92,6 +92,7 @@ func TestLoadEverything(t *testing.T) {
 		assert.NoError(t, err)
 
 		assert.Equal(t, http.StatusNoContent, rw.StatusCode)
+		// This one is complicated by the bind address loopback.
 		//assert.Equal(t, "https://sub.example.com", rw.Header.Get("Access-Control-Allow-Origin"))
 		assert.Equal(t, "GET", rw.Header.Get("Access-Control-Allow-Methods"))
 		assert.Equal(t, "X-Custom-Header", rw.Header.Get("Access-Control-Allow-Headers"))
