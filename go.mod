@@ -15,7 +15,7 @@ require (
 	github.com/pentops/jsonapi v0.0.0-20240105004945-273ef0c8bbc6
 	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
 	github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4
-	github.com/pentops/o5-go v0.0.0-20240108212127-807bf5c29410
+	github.com/pentops/o5-go v0.0.0-20240116023954-fa173a9df789
 	github.com/pentops/runner v0.0.0-20231219070819-c4878d5565d8
 	github.com/pentops/sqrlx.go v0.0.0-20240108202916-8687fdf983c0
 	github.com/rs/cors v1.10.1
@@ -62,5 +62,3 @@ require (
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/pentops/o5-go => /Users/daemonl/pentops/o5-go
