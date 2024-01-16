@@ -8,8 +8,6 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/entrypoint"
 	"gopkg.daemonl.com/envconf"
 
-	"github.com/aws/aws-sdk-go-v2/config"
-
 	"github.com/pentops/log.go/log"
 )
 
@@ -37,12 +35,13 @@ func main() {
 }
 
 func run(ctx context.Context, envConfig entrypoint.Config) error {
-	awsConfig, err := config.LoadDefaultConfig(ctx)
+
+	awsBuilder, err := entrypoint.NewDefaultAWSConfigBuilder(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to create AWS config builder: %w", err)
 	}
 
-	runtime, err := entrypoint.FromConfig(envConfig, awsConfig)
+	runtime, err := entrypoint.FromConfig(envConfig, awsBuilder)
 	if err != nil {
 		return fmt.Errorf("from config: %w", err)
 	}
