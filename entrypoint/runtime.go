@@ -11,7 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/pentops/jsonapi/jsonapi"
+	jsonapi_codec "github.com/pentops/jsonapi/codec"
+	"github.com/pentops/jsonapi/gen/j5/source/v1/source_j5pb"
+	"github.com/pentops/jsonapi/proxy"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
@@ -19,7 +21,6 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
-	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/pentops/runner"
 	"github.com/rs/cors"
@@ -77,32 +78,31 @@ func FromConfig(envConfig Config, awsConfig aws.Config) (*Runtime, error) {
 	}
 
 	if envConfig.PublicPort != 0 {
-		codecOptions := jsonapi.Options{
-			ShortEnums: &jsonapi.ShortEnumsOption{
+		codecOptions := &source_j5pb.CodecOptions{
+			ShortEnums: &source_j5pb.ShortEnumOptions{
 				UnspecifiedSuffix: "UNSPECIFIED",
 				StrictUnmarshal:   true,
 			},
 			WrapOneof: true,
 		}
 
-		router := proxy.NewRouter(codecOptions)
+		router := proxy.NewRouter(jsonapi_codec.NewCodec(codecOptions))
+
 		if len(envConfig.CORSOrigins) > 0 {
-			router.UseCORS(cors.Options{
+			router.Use(cors.New(cors.Options{
 				AllowedOrigins:   envConfig.CORSOrigins,
 				AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
 				AllowedHeaders:   []string{"*"},
 				AllowCredentials: true,
-			})
+			}).Handler)
+		}
+
+		if envConfig.StaticFiles != "" {
+			router.SetNotFoundHandler(http.FileServer(http.Dir(envConfig.StaticFiles)))
 		}
 
 		if err := rt.AddRouter(envConfig.PublicPort, router); err != nil {
 			return nil, fmt.Errorf("add router: %w", err)
-		}
-	}
-
-	if envConfig.StaticFiles != "" {
-		if err := rt.StaticFiles(envConfig.StaticFiles); err != nil {
-			return nil, fmt.Errorf("static files: %w", err)
 		}
 	}
 
@@ -292,15 +292,6 @@ func (rt *Runtime) AddOutbox(outboxURI string) error {
 	}
 
 	rt.outboxURIs = append(rt.outboxURIs, outboxURI)
-	return nil
-}
-
-func (rt *Runtime) StaticFiles(dirname string) error {
-	if rt.router == nil {
-		return fmt.Errorf("static files configured but no router")
-	}
-
-	rt.router.SetNotFoundHandler(http.FileServer(http.Dir(dirname)))
 	return nil
 }
 
