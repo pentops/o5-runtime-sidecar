@@ -2,15 +2,13 @@ package entrypoint
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/sns"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	jsonapi_codec "github.com/pentops/jsonapi/codec"
 	"github.com/pentops/jsonapi/gen/j5/source/v1/source_j5pb"
 	"github.com/pentops/jsonapi/proxy"
@@ -49,7 +47,7 @@ type Config struct {
 	JWKS []string `env:"JWKS" default:""`
 }
 
-func FromConfig(envConfig Config, awsConfig aws.Config) (*Runtime, error) {
+func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 
 	rt := NewRuntime()
 
@@ -57,7 +55,7 @@ func FromConfig(envConfig Config, awsConfig aws.Config) (*Runtime, error) {
 		if envConfig.SNSPrefix == "" {
 			return nil, fmt.Errorf("SNS prefix required when using Postgres outbox or subscribing to SQS")
 		}
-		rt.Sender = outbox.NewSNSBatcher(sns.NewFromConfig(awsConfig), envConfig.SNSPrefix)
+		rt.Sender = outbox.NewSNSBatcher(awsConfig.SNS(), envConfig.SNSPrefix)
 	}
 
 	if envConfig.PostgresOutboxURI != "" {
@@ -73,8 +71,7 @@ func FromConfig(envConfig Config, awsConfig aws.Config) (*Runtime, error) {
 	}
 
 	if envConfig.SQSURL != "" {
-		sqsClient := sqs.NewFromConfig(awsConfig)
-		rt.Worker = sqslink.NewWorker(sqsClient, envConfig.SQSURL, rt.Sender)
+		rt.Worker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, rt.Sender)
 	}
 
 	if envConfig.PublicPort != 0 {
@@ -245,7 +242,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	}
 
 	if !didAnything {
-		return fmt.Errorf("no services configured")
+		return NothingToDoError
 	}
 
 	if err := runGroup.Run(ctx); err != nil {
@@ -257,6 +254,8 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	return nil
 
 }
+
+var NothingToDoError = errors.New("no services configured")
 
 func (rt *Runtime) AddRouter(port int, router *proxy.Router) error {
 	if rt.router != nil {
