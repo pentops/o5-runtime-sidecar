@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pentops/jsonapi/proxy"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gopkg.in/square/go-jose.v2"

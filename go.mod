@@ -9,10 +9,9 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.29.1
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.4.0
-	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
 	github.com/pentops/flowtest v0.0.0-20231220033746-7f2a56d8275b
-	github.com/pentops/jsonapi v0.0.0-20240105004945-273ef0c8bbc6
+	github.com/pentops/jsonapi v0.0.0-20240116022521-f2565e9666a2
 	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
 	github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4
 	github.com/pentops/o5-go v0.0.0-20240108212127-807bf5c29410
@@ -43,6 +42,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
