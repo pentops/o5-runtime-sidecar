@@ -30,10 +30,10 @@ import (
 
 type Config struct {
 	// Port to expose to the external LB. 0 disables
-	PublicPort int `env:"PUBLIC_PORT" default:"0"`
+	PublicAddr string `env:"PUBLIC_ADDR" default:""`
 
 	// Port to expose locally to the running service(s). 0 disables
-	AdapterPort int `env:"ADAPTER_PORT" default:"0"`
+	AdapterAddr string `env:"ADAPTER_ADDR" default:""`
 
 	Service     []string `env:"SERVICE_ENDPOINT" default:""`
 	StaticFiles string   `env:"STATIC_FILES" default:""`
@@ -64,8 +64,8 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		}
 	}
 
-	if envConfig.AdapterPort != 0 {
-		if err := rt.AddAdapter(envConfig.AdapterPort); err != nil {
+	if envConfig.AdapterAddr != "" {
+		if err := rt.AddAdapter(envConfig.AdapterAddr); err != nil {
 			return nil, fmt.Errorf("add adapter: %w", err)
 		}
 	}
@@ -74,7 +74,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		rt.Worker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, rt.Sender)
 	}
 
-	if envConfig.PublicPort != 0 {
+	if envConfig.PublicAddr != "" {
 		codecOptions := &source_j5pb.CodecOptions{
 			ShortEnums: &source_j5pb.ShortEnumOptions{
 				UnspecifiedSuffix: "UNSPECIFIED",
@@ -98,7 +98,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 			router.SetNotFoundHandler(http.FileServer(http.Dir(envConfig.StaticFiles)))
 		}
 
-		if err := rt.AddRouter(envConfig.PublicPort, router); err != nil {
+		if err := rt.AddRouter(envConfig.PublicAddr, router); err != nil {
 			return nil, fmt.Errorf("add router: %w", err)
 		}
 	}
@@ -119,31 +119,87 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 }
 
 type GRPCServer struct {
-	Port   int
-	Server *grpc.Server
+	addr      string
+	server    *grpc.Server
+	listening chan struct{}
 }
 
 func (gg *GRPCServer) Run(ctx context.Context) error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", gg.Port))
+	lis, err := net.Listen("tcp", gg.addr)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
 	}
 
+	gg.addr = lis.Addr().String()
+	close(gg.listening)
+
+	log.WithField(ctx, "addr", gg.addr).Info("Listening")
+
 	go func() {
 		<-ctx.Done()
-		gg.Server.GracefulStop()
+		gg.server.GracefulStop()
 	}()
 
-	return gg.Server.Serve(lis)
+	return gg.server.Serve(lis)
+}
+
+func (gg *GRPCServer) Addr() string {
+	<-gg.listening
+	return gg.addr
+}
+
+type HTTPServer struct {
+	addr      string
+	listening chan struct{}
+	handler   http.Handler
+}
+
+func NewHTTPServer(addr string, handler http.Handler) *HTTPServer {
+	return &HTTPServer{
+		handler:   handler,
+		addr:      addr,
+		listening: make(chan struct{}),
+	}
+}
+
+func (hs *HTTPServer) Run(ctx context.Context) error {
+
+	lis, err := net.Listen("tcp", hs.addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen: %w", err)
+	}
+
+	srv := http.Server{
+		Handler: hs.handler,
+		Addr:    hs.addr,
+	}
+
+	hs.addr = lis.Addr().String()
+	close(hs.listening)
+
+	go func() {
+		<-ctx.Done()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.WithError(ctx, err).Error("Error shutting down server")
+		}
+	}()
+
+	return srv.Serve(lis)
+}
+
+func (hs *HTTPServer) Addr() string {
+	<-hs.listening
+	return hs.addr
 }
 
 type Runtime struct {
-	router     *proxy.Router
-	Worker     *sqslink.Worker
-	Sender     *outbox.SNSBatcher
-	JWKS       *jwks.JWKSManager
-	Adapter    *GRPCServer
-	PublicPort int
+	router *proxy.Router
+	Worker *sqslink.Worker
+	Sender *outbox.SNSBatcher
+	JWKS   *jwks.JWKSManager
+
+	Adapter      *GRPCServer
+	RouterServer *HTTPServer
 
 	httpServices []protoreflect.ServiceDescriptor
 
@@ -204,22 +260,10 @@ func (rt *Runtime) Run(ctx context.Context) error {
 
 		didAnything = true
 
-		srv := http.Server{
-			Handler: rt.router,
-			Addr:    fmt.Sprintf(":%d", rt.PublicPort),
-		}
-
 		if rt.JWKS != nil {
 			runGroup.Add("jwks", rt.JWKS.Run)
 			// Wait for keys to be loaded before starting the server
 		}
-
-		go func() {
-			<-ctx.Done()
-			if err := srv.Shutdown(ctx); err != nil {
-				log.WithError(ctx, err).Error("Error shutting down server")
-			}
-		}()
 
 		runGroup.Add("router", func(ctx context.Context) error {
 			if rt.JWKS != nil {
@@ -227,7 +271,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 					return fmt.Errorf("failed to load JWKS: %w", err)
 				}
 			}
-			return srv.ListenAndServe()
+			return rt.RouterServer.Run(ctx)
 		})
 	}
 
@@ -257,17 +301,17 @@ func (rt *Runtime) Run(ctx context.Context) error {
 
 var NothingToDoError = errors.New("no services configured")
 
-func (rt *Runtime) AddRouter(port int, router *proxy.Router) error {
+func (rt *Runtime) AddRouter(bind string, router *proxy.Router) error {
 	if rt.router != nil {
 		return fmt.Errorf("router already configured")
 	}
 
 	rt.router = router
-	rt.PublicPort = port
+	rt.RouterServer = NewHTTPServer(bind, router)
 	return nil
 }
 
-func (rt *Runtime) AddAdapter(port int) error {
+func (rt *Runtime) AddAdapter(bind string) error {
 	if rt.Sender == nil {
 		return fmt.Errorf("adapter requires a sender")
 	}
@@ -278,8 +322,8 @@ func (rt *Runtime) AddAdapter(port int) error {
 	reflection.Register(server)
 
 	rt.Adapter = &GRPCServer{
-		Port:   port,
-		Server: server,
+		addr:   bind,
+		server: server,
 	}
 
 	return nil
