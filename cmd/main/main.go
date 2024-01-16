@@ -15,20 +15,6 @@ import (
 
 var Version string
 
-type EnvConfig struct {
-	PublicPort  int    `env:"PUBLIC_PORT" default:"0"`
-	Service     string `env:"SERVICE_ENDPOINT" default:""`
-	StaticFiles string `env:"STATIC_FILES" default:""`
-	SQSURL      string `env:"SQS_URL" default:""`
-
-	PostgresOutboxURI string `env:"POSTGRES_OUTBOX" default:""`
-	SNSPrefix         string `env:"SNS_PREFIX" default:""`
-
-	CORSOrigins []string `env:"CORS_ORIGINS" default:""`
-
-	JWKS []string `env:"JWKS" default:""`
-}
-
 func main() {
 
 	ctx := context.Background()

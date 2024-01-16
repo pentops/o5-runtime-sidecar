@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 
@@ -13,6 +14,8 @@ import (
 	"github.com/pentops/jsonapi/jsonapi"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
+	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
+	"github.com/pentops/o5-runtime-sidecar/adapter"
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
@@ -22,11 +25,17 @@ import (
 	"github.com/rs/cors"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type Config struct {
-	PublicPort  int      `env:"PUBLIC_PORT" default:"0"`
+	// Port to expose to the external LB. 0 disables
+	PublicPort int `env:"PUBLIC_PORT" default:"0"`
+
+	// Port to expose locally to the running service(s). 0 disables
+	AdapterPort int `env:"ADAPTER_PORT" default:"0"`
+
 	Service     []string `env:"SERVICE_ENDPOINT" default:""`
 	StaticFiles string   `env:"STATIC_FILES" default:""`
 	SQSURL      string   `env:"SQS_URL" default:""`
@@ -53,6 +62,12 @@ func FromConfig(envConfig Config, awsConfig aws.Config) (*Runtime, error) {
 	if envConfig.PostgresOutboxURI != "" {
 		if err := rt.AddOutbox(envConfig.PostgresOutboxURI); err != nil {
 			return nil, fmt.Errorf("add outbox: %w", err)
+		}
+	}
+
+	if envConfig.AdapterPort != 0 {
+		if err := rt.AddAdapter(envConfig.AdapterPort); err != nil {
+			return nil, fmt.Errorf("add adapter: %w", err)
 		}
 	}
 
@@ -106,11 +121,31 @@ func FromConfig(envConfig Config, awsConfig aws.Config) (*Runtime, error) {
 	return rt, nil
 }
 
+type GRPCServer struct {
+	Port   int
+	Server *grpc.Server
+}
+
+func (gg *GRPCServer) Run(ctx context.Context) error {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", gg.Port))
+	if err != nil {
+		return fmt.Errorf("failed to listen: %w", err)
+	}
+
+	go func() {
+		<-ctx.Done()
+		gg.Server.GracefulStop()
+	}()
+
+	return gg.Server.Serve(lis)
+}
+
 type Runtime struct {
 	router     *proxy.Router
 	Worker     *sqslink.Worker
 	Sender     *outbox.SNSBatcher
 	JWKS       *jwks.JWKSManager
+	Adapter    *GRPCServer
 	PublicPort int
 
 	httpServices []protoreflect.ServiceDescriptor
@@ -201,9 +236,12 @@ func (rt *Runtime) Run(ctx context.Context) error {
 
 	if rt.Worker != nil {
 		didAnything = true
-		runGroup.Add("worker", func(ctx context.Context) error {
-			return rt.Worker.Run(ctx)
-		})
+		runGroup.Add("worker", rt.Worker.Run)
+	}
+
+	if rt.Adapter != nil {
+		didAnything = true
+		runGroup.Add("adapter", rt.Adapter.Run)
 	}
 
 	if !didAnything {
@@ -227,6 +265,24 @@ func (rt *Runtime) AddRouter(port int, router *proxy.Router) error {
 
 	rt.router = router
 	rt.PublicPort = port
+	return nil
+}
+
+func (rt *Runtime) AddAdapter(port int) error {
+	if rt.Sender == nil {
+		return fmt.Errorf("adapter requires a sender")
+	}
+
+	messageBridge := adapter.NewMessageBridge(rt.Sender)
+	server := grpc.NewServer()
+	messaging_tpb.RegisterMessageBridgeTopicServer(server, messageBridge)
+	reflection.Register(server)
+
+	rt.Adapter = &GRPCServer{
+		Port:   port,
+		Server: server,
+	}
+
 	return nil
 }
 
