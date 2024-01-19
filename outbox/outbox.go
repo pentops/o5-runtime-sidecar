@@ -3,6 +3,7 @@ package outbox
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -24,6 +25,13 @@ type Batcher interface {
 
 func Listen(ctx context.Context, url string, callback Batcher) error {
 
+	_, err := pq.ParseURL(url)
+	if err != nil {
+		// the URL can contain secrets, so we don't want to log it... but it
+		// does make debugging difficult.
+		return fmt.Errorf("parsing postgres URL: %w", err)
+	}
+
 	db, err := sql.Open("postgres", url)
 	if err != nil {
 		return err
@@ -34,7 +42,16 @@ func Listen(ctx context.Context, url string, callback Batcher) error {
 			log.WithError(ctx, err).Error("error in listener")
 		}
 	})
+	closed := false
+	go func() {
+		<-ctx.Done()
+		closed = true
+		pqListener.Close()
+	}()
 	for {
+		if closed {
+			return nil
+		}
 		if err := pqListener.Ping(); err != nil {
 			log.WithError(ctx, err).Error("pinging Listener PG")
 			time.Sleep(time.Second)
@@ -43,11 +60,6 @@ func Listen(ctx context.Context, url string, callback Batcher) error {
 		log.Info(ctx, "pinging Listener PG OK")
 		break
 	}
-
-	go func() {
-		<-ctx.Done()
-		pqListener.Close()
-	}()
 
 	dbWrapped, err := sqrlx.New(db, sq.Dollar)
 	if err != nil {

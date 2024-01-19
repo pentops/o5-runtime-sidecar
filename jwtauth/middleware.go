@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/pentops/jsonapi/proxy"
 	"github.com/pentops/log.go/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,7 +25,7 @@ const (
 	VerifiedJWTHeader = "X-Verified-JWT"
 )
 
-func JWKSAuthFunc(jwks JWKS) proxy.AuthFunc {
+func JWKSAuthFunc(jwks JWKS) func(context.Context, *http.Request) (map[string]string, error) {
 	return func(ctx context.Context, req *http.Request) (map[string]string, error) {
 
 		authHeader := req.Header.Get("Authorization")

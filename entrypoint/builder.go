@@ -8,6 +8,7 @@ import (
 	"github.com/pentops/jsonapi/gen/j5/source/v1/source_j5pb"
 	"github.com/pentops/jsonapi/proxy"
 	"github.com/pentops/jwtauth/jwks"
+	"github.com/pentops/o5-runtime-sidecar/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/rs/cors"
@@ -105,6 +106,9 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		}
 
 		rt.routerServer = newRouterServer(envConfig.PublicAddr, router)
+		if rt.jwks != nil {
+			rt.routerServer.globalAuth = proxy.AuthHeadersFunc(jwtauth.JWKSAuthFunc(rt.jwks))
+		}
 
 	}
 

@@ -8,12 +8,15 @@ import (
 
 	"github.com/pentops/jsonapi/proxy"
 	"github.com/pentops/log.go/log"
+	"github.com/pentops/o5-go/auth/v1/auth_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/adapter"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 type adapterServer struct {
@@ -58,9 +61,10 @@ func (gg *adapterServer) Addr() string {
 }
 
 type routerServer struct {
-	addr      string
-	listening chan struct{}
-	router    *proxy.Router
+	addr       string
+	listening  chan struct{}
+	router     *proxy.Router
+	globalAuth proxy.AuthHeaders
 
 	waitFor []func(context.Context) error
 }
@@ -78,7 +82,41 @@ func (hs *routerServer) WaitFor(cb func(context.Context) error) {
 }
 
 func (hs *routerServer) RegisterService(ctx context.Context, sd protoreflect.ServiceDescriptor, conn *grpc.ClientConn) error {
-	return hs.router.RegisterService(ctx, sd, conn)
+
+	methods := sd.Methods()
+	for ii := 0; ii < methods.Len(); ii++ {
+		method := methods.Get(ii)
+		if err := hs.RegisterMethod(ctx, method, conn); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.MethodDescriptor, conn *grpc.ClientConn) error {
+	methodConfig := proxy.GRPCMethodConfig{
+		Method:  md,
+		Invoker: conn,
+	}
+
+	methodOptions := md.Options().(*descriptorpb.MethodOptions)
+
+	authOpt := proto.GetExtension(methodOptions, auth_pb.E_Auth).(*auth_pb.AuthMethodOptions)
+	if authOpt != nil {
+		switch authOpt.AuthMethod.(type) {
+		case *auth_pb.AuthMethodOptions_None:
+			// nop but good for clarity
+			methodConfig.AuthHeaders = nil
+
+		case *auth_pb.AuthMethodOptions_JwtBearer:
+			if hs.globalAuth == nil {
+				return fmt.Errorf("auth method %T requires global auth - no JWKS configured", authOpt.AuthMethod)
+			}
+			methodConfig.AuthHeaders = hs.globalAuth
+		}
+	}
+	return hs.router.RegisterGRPCMethod(ctx, methodConfig)
 }
 
 func (hs *routerServer) Run(ctx context.Context) error {
