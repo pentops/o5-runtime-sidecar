@@ -12,7 +12,7 @@ require (
 	github.com/jhump/protoreflect v1.15.5
 	github.com/lib/pq v1.10.9
 	github.com/pentops/flowtest v0.0.0-20240111045946-d8249eae422d
-	github.com/pentops/jsonapi v0.0.0-20240124235438-f75a1bd13638
+	github.com/pentops/jsonapi v0.0.0-20240125182748-28bbbf8f7311
 	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
 	github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4
 	github.com/pentops/o5-go v0.0.0-20240124182625-d074b251dc80

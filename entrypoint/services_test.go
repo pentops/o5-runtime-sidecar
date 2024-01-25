@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/pentops/jsonapi/prototest"
 	"github.com/pentops/jsonapi/proxy"
-	"github.com/pentops/o5-runtime-sidecar/prototest"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
