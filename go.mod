@@ -11,10 +11,10 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/pentops/flowtest v0.0.0-20240111045946-d8249eae422d
-	github.com/pentops/jsonapi v0.0.0-20240119183000-75b3b4ca86bc
+	github.com/pentops/jsonapi v0.0.0-20240124235438-f75a1bd13638
 	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
 	github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4
-	github.com/pentops/o5-go v0.0.0-20240119184131-fda72d53358b
+	github.com/pentops/o5-go v0.0.0-20240124182625-d074b251dc80
 	github.com/pentops/runner v0.0.0-20240119184422-1878cd4dc14d
 	github.com/pentops/sqrlx.go v0.0.0-20240108202916-8687fdf983c0
 	github.com/rs/cors v1.10.1
@@ -47,7 +47,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/pentops/protostate v0.0.0-20240119005036-84ba3b72e953 // indirect
+	github.com/pentops/protostate v0.0.0-20240123024346-92bd7df61460 // indirect
 	github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
