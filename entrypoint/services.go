@@ -103,7 +103,23 @@ func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.Meth
 	methodOptions := md.Options().(*descriptorpb.MethodOptions)
 
 	authOpt := proto.GetExtension(methodOptions, auth_pb.E_Auth).(*auth_pb.AuthMethodOptions)
-	if authOpt != nil {
+	if authOpt == nil {
+		// fallback to default if available
+		methodOpt := proto.GetExtension(methodOptions, auth_pb.E_DefaultAuth).(*auth_pb.AuthMethodOptions)
+		if methodOpt != nil {
+			authOpt = methodOpt
+		}
+	}
+
+	if authOpt == nil {
+		// no auth is specified, use global auth if available
+		if hs.globalAuth != nil {
+			methodConfig.AuthHeaders = hs.globalAuth
+		} else {
+			// no auth is specified, and no global auth is available
+			methodConfig.AuthHeaders = nil
+		}
+	} else {
 		switch authOpt.AuthMethod.(type) {
 		case *auth_pb.AuthMethodOptions_None:
 			// nop but good for clarity
