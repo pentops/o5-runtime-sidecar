@@ -60,16 +60,21 @@ func (gg *adapterServer) Addr() string {
 	return gg.addr
 }
 
+type proxyRouter interface {
+	RegisterGRPCMethod(ctx context.Context, method proxy.GRPCMethodConfig) error
+	ServeHTTP(http.ResponseWriter, *http.Request)
+}
+
 type routerServer struct {
 	addr       string
 	listening  chan struct{}
-	router     *proxy.Router
+	router     proxyRouter
 	globalAuth proxy.AuthHeaders
 
 	waitFor []func(context.Context) error
 }
 
-func newRouterServer(addr string, router *proxy.Router) *routerServer {
+func newRouterServer(addr string, router proxyRouter) *routerServer {
 	return &routerServer{
 		router:    router,
 		addr:      addr,
@@ -105,7 +110,8 @@ func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.Meth
 	authOpt := proto.GetExtension(methodOptions, auth_pb.E_Auth).(*auth_pb.AuthMethodOptions)
 	if authOpt == nil {
 		// fallback to default if available
-		methodOpt := proto.GetExtension(methodOptions, auth_pb.E_DefaultAuth).(*auth_pb.AuthMethodOptions)
+		serviceOptions := md.Parent().Options().(*descriptorpb.ServiceOptions)
+		methodOpt := proto.GetExtension(serviceOptions, auth_pb.E_DefaultAuth).(*auth_pb.AuthMethodOptions)
 		if methodOpt != nil {
 			authOpt = methodOpt
 		}
