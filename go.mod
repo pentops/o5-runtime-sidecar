@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.29.1
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.4.0
+	github.com/jhump/protoreflect v1.15.5
 	github.com/lib/pq v1.10.9
 	github.com/pentops/flowtest v0.0.0-20240111045946-d8249eae422d
 	github.com/pentops/jsonapi v0.0.0-20240124235438-f75a1bd13638
@@ -39,6 +40,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.21.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.26.1 // indirect
 	github.com/aws/smithy-go v1.18.1 // indirect
+	github.com/bufbuild/protocompile v0.8.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
