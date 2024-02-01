@@ -31,6 +31,9 @@ type Config struct {
 	CORSOrigins []string `env:"CORS_ORIGINS" default:""`
 
 	JWKS []string `env:"JWKS" default:""`
+
+	ResendChance     int `env:"RESEND_CHANCE"`
+	DeadletterChance int `env:"DEADLETTER_CHANCE"`
 }
 
 func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
@@ -62,7 +65,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		if rt.sender == nil {
 			return nil, fmt.Errorf("outbox requires a sender (set SNS_PREFIX)")
 		}
-		rt.queueWorker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, rt.sender)
+		rt.queueWorker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, rt.sender, envConfig.ResendChance, envConfig.DeadletterChance)
 	}
 
 	if envConfig.AdapterAddr != "" {
