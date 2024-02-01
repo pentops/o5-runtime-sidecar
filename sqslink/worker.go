@@ -67,6 +67,7 @@ func randomlySelected(ctx context.Context, pct int) bool {
 	r, err := rand.Int(rand.Reader, big.NewInt(100))
 	if err != nil {
 		log.WithError(ctx, err).Error("couldn't generate random number for selecting message")
+		return false
 	}
 
 	if r.Int64() <= big.NewInt(int64(pct)).Int64() {
