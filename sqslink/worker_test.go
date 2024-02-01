@@ -11,9 +11,19 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+func TestChance(t *testing.T) {
+	ctx := context.Background()
+	if randomlySelected(ctx, 0) == true {
+		t.Fatal("No chance but it happened")
+	}
+	if randomlySelected(ctx, 100) == false {
+		t.Fatal("Guaranteed but didn't happen")
+	}
+}
+
 func TestWorker(t *testing.T) {
 
-	ww := NewWorker(nil, "https://test.com/queue", nil)
+	ww := NewWorker(nil, "https://test.com/queue", nil, 0, 0)
 
 	fd := testpb.File_test_v1_test_proto.Services().Get(1).Methods().Get(0)
 	if err := ww.registerMethod(context.Background(), fd, nil); err != nil {

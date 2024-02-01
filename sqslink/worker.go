@@ -2,9 +2,11 @@ package sqslink
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -41,16 +43,48 @@ type Worker struct {
 	SQSClient         SQSAPI
 	QueueURL          string
 	deadLetterHandler DeadLetterHandler
+	resendChance      int
+	deadletterChance  int
 
 	services map[string]*service
 }
 
-func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler) *Worker {
+// Is this message is randomly selected based on percent received?
+func randomlySelected(ctx context.Context, pct int) bool {
+	if pct == 0 {
+		return false
+	}
+
+	if pct == 100 {
+		return true
+	}
+
+	if pct > 100 || pct < 0 {
+		log.Infof(ctx, "Received invalid percent for randomly selecting a message: %v", pct)
+		return false
+	}
+
+	r, err := rand.Int(rand.Reader, big.NewInt(100))
+	if err != nil {
+		log.WithError(ctx, err).Error("couldn't generate random number for selecting message")
+		return false
+	}
+
+	if r.Int64() <= big.NewInt(int64(pct)).Int64() {
+		log.Infof(ctx, "Message randomly selected: rand of %v and percent of %v", r.Int64(), pct)
+		return true
+	}
+	return false
+}
+
+func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance, deadletterChance int) *Worker {
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
 		services:          make(map[string]*service),
 		deadLetterHandler: deadLetters,
+		resendChance:      resendChance,
+		deadletterChance:  deadletterChance,
 	}
 }
 
@@ -153,6 +187,10 @@ func (ww *Worker) Run(ctx context.Context) error {
 
 		for _, msg := range out.Messages {
 			ww.handleMessage(ctx, msg)
+
+			if randomlySelected(ctx, ww.resendChance) {
+				ww.handleMessage(ctx, msg)
+			}
 		}
 	}
 }
@@ -178,9 +216,6 @@ func getReceiveCount(msg types.Message) int {
 }
 
 func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
-	//messageID := *msg.MessageId
-	//receiptHandle := *msg.ReceiptHandle
-
 	parsed, handler, err := ww.parseMessage(msg)
 	if err != nil {
 		// Leave it here, we need to retry
@@ -195,6 +230,14 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	log.Debug(ctx, "begin handle message")
 
 	err = handler.HandleMessage(ctx, parsed)
+
+	// deadletter even if successful based on deadletterChance
+	if err == nil && randomlySelected(ctx, ww.deadletterChance) {
+		err := ww.killMessage(ctx, parsed, err)
+		if err != nil {
+			log.WithField(ctx, "killError", err.Error()).Error("Error selectively killing message, leaving in queue")
+		}
+	}
 	if err != nil {
 		ctx = log.WithError(ctx, err)
 		log.Error(ctx, "Error handling message")
@@ -283,7 +326,7 @@ func (ss *service) parseMessageBody(contentType string, raw []byte) (proto.Messa
 	return msg, nil
 }
 
-func (ww *Worker) parseMessage(msg types.Message) (*Message, Handler, error) { //*service, proto.Message, error) {
+func (ww *Worker) parseMessage(msg types.Message) (*Message, Handler, error) {
 
 	// Parse Message
 	var serviceName string
