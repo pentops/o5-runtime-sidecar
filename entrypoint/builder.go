@@ -32,8 +32,8 @@ type Config struct {
 
 	JWKS []string `env:"JWKS" default:""`
 
-	ResendChance     int `env:"RESEND_CHANCE"`
-	DeadletterChance int `env:"DEADLETTER_CHANCE"`
+	ResendChance     int `env:"RESEND_CHANCE" required:"false"`
+	DeadletterChance int `env:"DEADLETTER_CHANCE" required:"false"`
 }
 
 func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
