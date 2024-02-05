@@ -36,7 +36,6 @@ type MarshalledMessage struct {
 }
 
 func (b *SNSBatcher) SendMarshalled(ctx context.Context, message MarshalledMessage) error {
-
 	encoded := base64.StdEncoding.EncodeToString(message.Body)
 	attributes := map[string]types.MessageAttributeValue{}
 
@@ -112,7 +111,6 @@ func encodeMessage(msg *Message) *snsMessage {
 }
 
 func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*Message) error {
-
 	dest := b.prefix + destination
 
 	for len(msgs) > 0 {

@@ -24,7 +24,6 @@ type Batcher interface {
 }
 
 func Listen(ctx context.Context, url string, callback Batcher) error {
-
 	_, err := pq.ParseURL(url)
 	if err != nil {
 		// the URL can contain secrets, so we don't want to log it... but it
@@ -95,11 +94,10 @@ type listener struct {
 }
 
 func (ll listener) loopUntilEmpty(ctx context.Context, callback Batcher) error {
-
 	for {
 		count, err := ll.doPage(ctx, callback)
 		if err != nil {
-			return err
+			return fmt.Errorf("error doing page of messages: %w", err)
 		}
 		if count == 0 {
 			return nil
@@ -108,7 +106,6 @@ func (ll listener) loopUntilEmpty(ctx context.Context, callback Batcher) error {
 }
 
 func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
-
 	qq := sq.Select(
 		"id",
 		"destination",
@@ -129,7 +126,7 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 		count = 0
 		rows, err := tx.Select(ctx, qq)
 		if err != nil {
-			return err
+			return fmt.Errorf("error selecting outbox messages: %w", err)
 		}
 
 		defer rows.Close()
@@ -149,12 +146,12 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 				&message,
 				&headerString,
 			); err != nil {
-				return err
+				return fmt.Errorf("error scanning outbox row: %w", err)
 			}
 
 			headers, err := url.ParseQuery(headerString)
 			if err != nil {
-				return err
+				return fmt.Errorf("error parsing headers from outbox message: %w", err)
 			}
 
 			msg := &Message{
@@ -167,12 +164,12 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 		}
 
 		if err := rows.Err(); err != nil {
-			return err
+			return fmt.Errorf("error in outbox rows: %w", err)
 		}
 
 		for destination, messages := range byDestination {
 			if err := callback.SendBatch(ctx, destination, messages); err != nil {
-				return err
+				return fmt.Errorf("error sending batch of outbox messages: %w", err)
 			}
 			for _, msg := range messages {
 				successIDs = append(successIDs, msg.ID)
@@ -183,7 +180,7 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 			Delete("outbox").
 			Where("id = ANY(?)", pq.Array(successIDs)))
 		if err != nil {
-			return err
+			return fmt.Errorf("error deleting sent outbox messages: %w", err)
 		}
 
 		return nil
