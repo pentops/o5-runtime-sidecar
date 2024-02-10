@@ -98,7 +98,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		if len(envConfig.CORSOrigins) > 0 {
 			router.Use(cors.New(cors.Options{
 				AllowedOrigins:   envConfig.CORSOrigins,
-				AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+				AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 				AllowedHeaders:   []string{"*"},
 				AllowCredentials: true,
 			}).Handler)

@@ -21,7 +21,7 @@ func TestCORS(t *testing.T) {
 
 	handler = cors.New(cors.Options{
 		AllowedOrigins:   []string{"https://*.example.com"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	}).Handler(handler)
