@@ -137,6 +137,7 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 			snsMessage := &SNSMessageWrapper{}
 			err := json.Unmarshal(b, snsMessage)
 			if err != nil {
+				log.WithError(ctx, err).Error("failed to unmarshal SNS message, falling back to raw")
 				return &messaging_tpb.RawMessage{
 					Payload: b,
 				}, nil
@@ -144,7 +145,7 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 
 			return &messaging_tpb.RawMessage{
 				Topic:   snsMessage.TopicArn,
-				Payload: snsMessage.Message,
+				Payload: []byte(snsMessage.Message),
 			}, nil
 		}
 	}
@@ -279,7 +280,7 @@ type Handler interface {
 
 type SNSMessageWrapper struct {
 	Type      string `json:"Type"`
-	Message   []byte `json:"Message"`
+	Message   string `json:"Message"`
 	MessageID string `json:"MessageId"`
 	TopicArn  string `json:"TopicArn"`
 }
@@ -297,7 +298,7 @@ func (ss *service) parseMessageBody(contentType string, raw []byte) (proto.Messa
 			snsMessage := &SNSMessageWrapper{}
 			err := json.Unmarshal(raw, snsMessage)
 			if err == nil { // IF NO ERROR
-				raw = snsMessage.Message
+				raw = []byte(snsMessage.Message)
 			}
 
 		} else {
@@ -369,6 +370,10 @@ func (ww *Worker) parseMessage(msg types.Message) (*Message, Handler, error) {
 var messageIDNamespace = uuid.MustParse("B71AFF66-460A-424C-8927-9AF8C9135BF9")
 
 func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error) error {
+
+	if ww.deadLetterHandler == nil {
+		return fmt.Errorf("no dead letter handler")
+	}
 
 	inputAny, err := anypb.New(msg.Proto)
 	if err != nil {
