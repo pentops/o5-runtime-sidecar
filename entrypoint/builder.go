@@ -34,6 +34,8 @@ type Config struct {
 
 	ResendChance     int `env:"RESEND_CHANCE" required:"false"`
 	DeadletterChance int `env:"DEADLETTER_CHANCE" required:"false"`
+
+	NoDeadLetters bool `env:"NO_DEADLETTERS" default:"false"`
 }
 
 func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
@@ -62,10 +64,14 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	}
 
 	if envConfig.SQSURL != "" {
-		if rt.sender == nil {
-			return nil, fmt.Errorf("outbox requires a sender (set SNS_PREFIX)")
+		var sender sqslink.DeadLetterHandler
+		if !envConfig.NoDeadLetters {
+			if rt.sender == nil {
+				return nil, fmt.Errorf("outbox requires a sender (set SNS_PREFIX)")
+			}
+			sender = rt.sender
 		}
-		rt.queueWorker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, rt.sender, envConfig.ResendChance, envConfig.DeadletterChance)
+		rt.queueWorker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, sender, envConfig.ResendChance, envConfig.DeadletterChance)
 	}
 
 	if envConfig.AdapterAddr != "" {
