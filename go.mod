@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/pentops/flowtest v0.0.0-20240111045946-d8249eae422d
-	github.com/pentops/jsonapi v0.0.0-20240206223436-9365660a4610
+	github.com/pentops/jsonapi v0.0.0-20240229223809-c321fea7341c
 	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
 	github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4
 	github.com/pentops/o5-go v0.0.0-20240228193034-6465502c2ccc
@@ -49,7 +49,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
-	github.com/pentops/protostate v0.0.0-20240228001229-c03cf1448aa9 // indirect
+	github.com/pentops/protostate v0.0.0-20240229011055-77ef5e76dba9 // indirect
 	github.com/pentops/sugar-go v0.0.0-20231029194349-ec12ec0132c5 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
