@@ -234,7 +234,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 
 	// deadletter even if successful based on deadletterChance
 	if err == nil && randomlySelected(ctx, ww.deadletterChance) {
-		err := ww.killMessage(ctx, parsed, err)
+		err := ww.killMessage(ctx, parsed, fmt.Errorf("sidecar deadletter chance selected this message to kill"))
 		if err != nil {
 			log.WithField(ctx, "killError", err.Error()).Error("Error selectively killing message, leaving in queue")
 		}
