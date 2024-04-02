@@ -14,7 +14,6 @@ type Service struct {
 }
 
 func TestProtoReadHappy(t *testing.T) {
-
 	grpcPair := flowtest.NewGRPCPair(t)
 
 	service := &Service{}
