@@ -2,6 +2,7 @@ package adapter
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
@@ -24,7 +25,6 @@ func NewMessageBridge(sender Sender) *MessageBridge {
 }
 
 func (mb *MessageBridge) Send(ctx context.Context, req *messaging_tpb.SendMessage) (*emptypb.Empty, error) {
-
 	headers := map[string]string{}
 	for _, header := range req.Headers {
 		headers[header.Key] = header.Value
@@ -37,7 +37,7 @@ func (mb *MessageBridge) Send(ctx context.Context, req *messaging_tpb.SendMessag
 	}
 
 	if err := mb.sender.SendMarshalled(ctx, msg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't send marshalled msg: %w", err)
 	}
 	return &emptypb.Empty{}, nil
 }

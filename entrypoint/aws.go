@@ -2,6 +2,7 @@ package entrypoint
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -28,7 +29,7 @@ func NewAWSConfigBuilder(provided aws.Config) *AWSConfigBuilder {
 func NewDefaultAWSConfigBuilder(ctx context.Context) (*AWSConfigBuilder, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("couldn't load aws config: %w", err)
 	}
 	return NewAWSConfigBuilder(cfg), nil
 }

@@ -14,7 +14,6 @@ import (
 var Version string
 
 func main() {
-
 	ctx := context.Background()
 	ctx = log.WithFields(ctx, map[string]interface{}{
 		"application": "o5-runtime-sidecar",
@@ -35,7 +34,6 @@ func main() {
 }
 
 func run(ctx context.Context, envConfig entrypoint.Config) error {
-
 	awsBuilder, err := entrypoint.NewDefaultAWSConfigBuilder(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create AWS config builder: %w", err)

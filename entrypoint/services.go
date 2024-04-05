@@ -92,7 +92,7 @@ func (hs *routerServer) RegisterService(ctx context.Context, sd protoreflect.Ser
 	for ii := 0; ii < methods.Len(); ii++ {
 		method := methods.Get(ii)
 		if err := hs.RegisterMethod(ctx, method, conn); err != nil {
-			return err
+			return fmt.Errorf("failed to register grpc method: %w", err)
 		}
 	}
 
@@ -142,7 +142,6 @@ func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.Meth
 }
 
 func (hs *routerServer) Run(ctx context.Context) error {
-
 	for _, ch := range hs.waitFor {
 		if err := ch(ctx); err != nil {
 			return err

@@ -156,7 +156,6 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 }
 
 func (ww *Worker) Run(ctx context.Context) error {
-
 	for {
 		out, err := ww.SQSClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
 			QueueUrl: &ww.QueueURL,
@@ -328,7 +327,6 @@ func (ss *service) parseMessageBody(contentType string, raw []byte) (proto.Messa
 }
 
 func (ww *Worker) parseMessage(msg types.Message) (*Message, Handler, error) {
-
 	// Parse Message
 	var serviceName string
 	serviceNameAttributeValue, ok := msg.MessageAttributes[serviceAttribute]
@@ -370,7 +368,6 @@ func (ww *Worker) parseMessage(msg types.Message) (*Message, Handler, error) {
 var messageIDNamespace = uuid.MustParse("B71AFF66-460A-424C-8927-9AF8C9135BF9")
 
 func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error) error {
-
 	if ww.deadLetterHandler == nil {
 		return fmt.Errorf("no dead letter handler")
 	}
