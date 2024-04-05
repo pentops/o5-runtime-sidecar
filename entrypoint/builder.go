@@ -39,7 +39,6 @@ type Config struct {
 }
 
 func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
-
 	rt := NewRuntime()
 	rt.endpoints = envConfig.ServiceEndpoints
 

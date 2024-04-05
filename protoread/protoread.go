@@ -22,7 +22,6 @@ func FetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.S
 }
 
 func fetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
-
 	client := grpc_reflection_v1.NewServerReflectionClient(conn)
 
 	var stream grpc_reflection_v1.ServerReflection_ServerReflectionInfoClient
