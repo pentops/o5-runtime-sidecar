@@ -100,6 +100,10 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 
 		router := proxy.NewRouter(jsonapi_codec.NewCodec(codecOptions))
 
+		router.HealthCheck("/healthz", func() error {
+			return nil
+		})
+
 		if len(envConfig.CORSOrigins) > 0 {
 			router.Use(cors.New(cors.Options{
 				AllowedOrigins:   envConfig.CORSOrigins,
