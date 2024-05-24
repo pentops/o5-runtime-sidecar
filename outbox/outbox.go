@@ -258,11 +258,11 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 			Where("id = ANY(?)", pq.Array(successIDs)))
 
 		if sendError != nil {
-			return fmt.Errorf("error sending batch of outbox messages: %w", err)
+			return fmt.Errorf("error sending batch of outbox messages: %w", sendError)
 		}
 
 		if txError != nil {
-			return fmt.Errorf("error deleting sent outbox messages: %w", err)
+			return fmt.Errorf("error deleting sent outbox messages: %w", txError)
 		}
 
 		return nil
