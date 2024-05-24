@@ -72,8 +72,6 @@ func (p *EventBridgePublisher) SendMultiBatch(ctx context.Context, msgs []*Messa
 			return nil, err
 		}
 
-		fmt.Println(string(detailJSON))
-
 		entries[idx] = types.PutEventsRequestEntry{
 			Detail:       aws.String(string(detailJSON)),
 			DetailType:   aws.String("o5-message"),
