@@ -141,12 +141,7 @@ func (ss service) parseMessageBody(contentType string, raw []byte) (proto.Messag
 			return nil, fmt.Errorf("failed to unmarshal json: %w", err)
 		}
 	case "application/protobuf":
-		msgBytes, err := base64.StdEncoding.DecodeString(string(raw))
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode base64: %w", err)
-		}
-
-		if err := proto.Unmarshal(msgBytes, msg); err != nil {
+		if err := proto.Unmarshal(raw, msg); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
 		}
 	default:
@@ -379,11 +374,21 @@ func parseMessage(msg types.Message) (*O5Message, error) {
 	contentTypeAttributeValue, ok := msg.MessageAttributes[contentTypeAttribute]
 	if ok {
 		contentType = *contentTypeAttributeValue.StringValue
-	} else if len(body) > 0 && (body[0] == '{' || body[0] == '[') {
-		contentType = "application/json"
-	} else {
-		// fairly big assumption...
-		contentType = "application/protobuf"
+	}
+	if contentType == "" {
+		if len(body) > 0 && (body[0] == '{' || body[0] == '[') {
+			contentType = "application/json"
+		} else {
+			// fairly big assumption...
+			contentType = "application/protobuf"
+
+			msgBytes, err := base64.StdEncoding.DecodeString(string(body))
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode base64: %w", err)
+			}
+			body = msgBytes
+
+		}
 	}
 
 	serviceNameAttributeValue, ok := msg.MessageAttributes[serviceAttribute]
@@ -425,6 +430,9 @@ func parseMessage(msg types.Message) (*O5Message, error) {
 				return nil, fmt.Errorf("failed to unmarshal o5-message: %w", err)
 			}
 			outboxMessage.SQSMessageID = *msg.MessageId
+			if outboxMessage.ContentType == "" {
+				outboxMessage.ContentType = "application/protobuf"
+			}
 			return outboxMessage, nil
 
 		default:
