@@ -257,7 +257,7 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 
 		successIDs, sendError := callback.SendMultiBatch(ctx, messages)
 
-		_, deleteError := tx.Exec(ctx, sq.
+		res, deleteError := tx.Delete(ctx, sq.
 			Delete("outbox").
 			Where("id = ANY(?)", pq.Array(successIDs)))
 
@@ -267,6 +267,13 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 
 		if deleteError != nil {
 			return fmt.Errorf("error deleting sent outbox messages: %w", deleteError)
+		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("error getting rows affected: %w", err)
+		}
+		if rowsAffected != int64(len(successIDs)) {
+			return fmt.Errorf("expected to delete %d rows, but deleted %d", len(successIDs), rowsAffected)
 		}
 
 		return nil

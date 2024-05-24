@@ -100,7 +100,7 @@ func (p *EventBridgePublisher) SendMultiBatch(ctx context.Context, msgs []*Messa
 			continue
 		}
 
-		successfulIDs = append(successfulIDs, *entry.EventId)
+		successfulIDs = append(successfulIDs, request.ID)
 	}
 
 	return successfulIDs, firstError
