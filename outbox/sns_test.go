@@ -27,8 +27,8 @@ func TestSNSBatcher(t *testing.T) {
 		messages[idx] = &Message{
 			ID:      fmt.Sprintf("id%d", idx),
 			Message: []byte(fmt.Sprintf("message %d", idx)),
-			Headers: map[string][]string{
-				"foo": {fmt.Sprintf("foo%d", idx)},
+			Headers: map[string]string{
+				"foo": fmt.Sprintf("foo%d", idx),
 			},
 		}
 	}

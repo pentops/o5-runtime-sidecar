@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	sq "github.com/elgris/sqrl"
@@ -14,13 +15,86 @@ import (
 )
 
 type Message struct {
-	ID      string
-	Message []byte
-	Headers map[string][]string
+	ID                string            `json:"id"`
+	Message           []byte            `json:"body"`
+	Destination       string            `json:"topic-name"`
+	Headers           map[string]string `json:"headers"`
+	SourceEnvironment string            `json:"source-environment"`
+	ContentType       string            `json:"content-type"`
+
+	GrpcService string  `json:"grpc-service"`
+	GrpcMethod  string  `json:"grpc-method"`
+	GrpcMessage string  `json:"grpc-message"`
+	ReplyDest   *string `json:"reply-dest,omitempty"`
+}
+
+func (msg *Message) expandAndValidate() error {
+	for k, v := range msg.Headers {
+		v := v
+		if k == "grpc-service" {
+			msg.GrpcService = v
+			delete(msg.Headers, k)
+			continue
+		}
+		if k == "grpc-method" {
+			msg.GrpcMethod = v
+			delete(msg.Headers, k)
+			continue
+		}
+		if k == "grpc-message" {
+			msg.GrpcMessage = v
+			delete(msg.Headers, k)
+			continue
+		}
+		if k == "content-type" {
+			msg.ContentType = v
+			delete(msg.Headers, k)
+			continue
+		}
+		if k == "o5-reply-reply-to" {
+			msg.ReplyDest = &v
+			delete(msg.Headers, k)
+			continue
+		}
+	}
+
+	if msg.GrpcMessage == "" {
+		return fmt.Errorf("grpc-message header missing from outbox message")
+	}
+
+	if msg.GrpcService == "" {
+		return fmt.Errorf("grpc-service header missing from outbox message")
+	}
+
+	parts := strings.Split(msg.GrpcService, "/")
+	if len(parts) == 2 && parts[0] == "" {
+		// '/package.service'
+		parts = []string{parts[1]}
+	}
+	if len(parts) == 1 {
+		// 'package.service'
+		if msg.GrpcMethod == "" {
+			return fmt.Errorf("grpc-service header should be /package.service/method, or grpc-method should be set. %s", msg.GrpcService)
+		}
+	} else {
+		// '/package.service/method'
+		if len(parts) != 3 || parts[0] != "" {
+			return fmt.Errorf("grpc-service header has wrong format, should be /package.service/method, or just package.service with grpc-method set : %s", msg.GrpcService)
+		}
+		if msg.GrpcMethod == "" {
+			msg.GrpcMethod = parts[2]
+		} else if msg.GrpcMethod != parts[2] {
+			return fmt.Errorf("grpc-service header specified as /package.service/method, but grpc-method did not match: %s %s", msg.GrpcService, msg.GrpcMethod)
+		}
+
+		msg.GrpcService = parts[1]
+	}
+
+	return nil
 }
 
 type Batcher interface {
-	SendBatch(ctx context.Context, destination string, messages []*Message) error
+	SendMultiBatch(ctx context.Context, messages []*Message) ([]string, error)
 }
 
 func Listen(ctx context.Context, url string, callback Batcher) error {
@@ -131,8 +205,7 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 
 		defer rows.Close()
 
-		byDestination := map[string][]*Message{}
-		successIDs := []string{}
+		messages := []*Message{}
 
 		for rows.Next() {
 			count++
@@ -153,33 +226,42 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 			if err != nil {
 				return fmt.Errorf("error parsing headers from outbox message: %w", err)
 			}
-
-			msg := &Message{
-				ID:      id,
-				Message: message,
-				Headers: headers,
+			simpleHeaders := map[string]string{}
+			for k, v := range headers {
+				simpleHeaders[k] = v[0]
 			}
 
-			byDestination[destination] = append(byDestination[destination], msg)
+			msg := &Message{
+				ID:          id,
+				Message:     message,
+				Headers:     simpleHeaders,
+				Destination: destination,
+			}
+
+			if err := msg.expandAndValidate(); err != nil {
+				return err
+			}
+
+			messages = append(messages, msg)
 		}
 
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("error in outbox rows: %w", err)
 		}
 
-		for destination, messages := range byDestination {
-			if err := callback.SendBatch(ctx, destination, messages); err != nil {
-				return fmt.Errorf("error sending batch of outbox messages: %w", err)
-			}
-			for _, msg := range messages {
-				successIDs = append(successIDs, msg.ID)
-			}
-		}
+		// NOTE: Error handling from here is out of usual order.
 
-		_, err = tx.Exec(ctx, sq.
+		successIDs, sendError := callback.SendMultiBatch(ctx, messages)
+
+		_, txError := tx.Exec(ctx, sq.
 			Delete("outbox").
 			Where("id = ANY(?)", pq.Array(successIDs)))
-		if err != nil {
+
+		if sendError != nil {
+			return fmt.Errorf("error sending batch of outbox messages: %w", err)
+		}
+
+		if txError != nil {
 			return fmt.Errorf("error deleting sent outbox messages: %w", err)
 		}
 

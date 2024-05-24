@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 )
@@ -20,6 +21,10 @@ func (acb *AWSConfigBuilder) SNS() SNSAPI {
 
 func (acb *AWSConfigBuilder) SQS() SQSAPI {
 	return sqs.NewFromConfig(acb.config)
+}
+
+func (acb *AWSConfigBuilder) EventBridge() EventBridgeAPI {
+	return eventbridge.NewFromConfig(acb.config)
 }
 
 func NewAWSConfigBuilder(provided aws.Config) *AWSConfigBuilder {
@@ -37,6 +42,7 @@ func NewDefaultAWSConfigBuilder(ctx context.Context) (*AWSConfigBuilder, error) 
 type AWSProvider interface {
 	SNS() SNSAPI
 	SQS() SQSAPI
+	EventBridge() EventBridgeAPI
 }
 
 // SNSAPI is an interface for the SNS client which satisfies the interfaces of
@@ -51,4 +57,10 @@ type SNSAPI interface {
 type SQSAPI interface {
 	ReceiveMessage(ctx context.Context, input *sqs.ReceiveMessageInput, opts ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
 	DeleteMessage(ctx context.Context, input *sqs.DeleteMessageInput, opts ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
+}
+
+// EventBridgeAPI is an interface for the EventBridge client which satisfies the
+// interfaces of other packages
+type EventBridgeAPI interface {
+	PutEvents(ctx context.Context, params *eventbridge.PutEventsInput, optFns ...func(*eventbridge.Options)) (*eventbridge.PutEventsOutput, error)
 }

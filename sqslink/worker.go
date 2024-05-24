@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
@@ -44,9 +45,18 @@ type Worker struct {
 	QueueURL          string
 	deadLetterHandler DeadLetterHandler
 	resendChance      int
-	deadletterChance  int
 
-	services map[string]*service
+	services map[string]Handler
+}
+
+type Handler interface {
+	HandleMessage(context.Context, *O5Message) error
+}
+
+type HandlerFunc func(context.Context, *O5Message) error
+
+func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *O5Message) error {
+	return hf(ctx, msg)
 }
 
 // Is this message is randomly selected based on percent received?
@@ -77,19 +87,25 @@ func randomlySelected(ctx context.Context, pct int) bool {
 	return false
 }
 
-func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance, deadletterChance int) *Worker {
+func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int) *Worker {
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
-		services:          make(map[string]*service),
+		services:          make(map[string]Handler),
 		deadLetterHandler: deadLetters,
 		resendChance:      resendChance,
-		deadletterChance:  deadletterChance,
 	}
 }
 
 type Invoker interface {
 	Invoke(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
+}
+
+type GRPCMessage struct {
+	Proto        proto.Message
+	ServiceName  string
+	SQSMessageID string
+	MessageID    string
 }
 
 type service struct {
@@ -99,12 +115,45 @@ type service struct {
 	customParser   func([]byte) (proto.Message, error)
 }
 
-func (ss service) HandleMessage(ctx context.Context, message *Message) error {
+func (ss service) HandleMessage(ctx context.Context, msg *O5Message) error {
+	protoBody, err := ss.parseMessageBody(msg.ContentType, msg.Message)
+	if err != nil {
+		return fmt.Errorf("failed to parse message body: %w", err)
+	}
+
 	outputMessage := &emptypb.Empty{}
 	// Receive response header
 	var responseHeader metadata.MD
-	err := ss.invoker.Invoke(ctx, ss.fullName, message.Proto, outputMessage, grpc.Header(&responseHeader))
+	err = ss.invoker.Invoke(ctx, ss.fullName, protoBody, outputMessage, grpc.Header(&responseHeader))
 	return err
+}
+
+func (ss service) parseMessageBody(contentType string, raw []byte) (proto.Message, error) {
+	if ss.customParser != nil {
+		return ss.customParser(raw)
+	}
+
+	msg := dynamicpb.NewMessage(ss.requestMessage)
+
+	switch contentType {
+	case "application/json":
+		if err := protojson.Unmarshal(raw, msg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal json: %w", err)
+		}
+	case "application/protobuf":
+		msgBytes, err := base64.StdEncoding.DecodeString(string(raw))
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode base64: %w", err)
+		}
+
+		if err := proto.Unmarshal(msgBytes, msg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unknown content type: %s", contentType)
+	}
+
+	return msg, nil
 }
 
 type Endpoint interface {
@@ -155,44 +204,60 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 	return nil
 }
 
+func (ww *Worker) RegisterHandler(fullMethod string, handler Handler) {
+	ww.services[fullMethod] = handler
+}
+
 func (ww *Worker) Run(ctx context.Context) error {
 	for {
-		out, err := ww.SQSClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
-			QueueUrl: &ww.QueueURL,
-
-			// Max = 10
-			MaxNumberOfMessages: 10,
-
-			// The duration (in seconds) for which the call waits for a message to arrive in
-			// the queue before returning.
-			WaitTimeSeconds: 5,
-
-			// The duration (in seconds) that the received messages are hidden from subsequent
-			// retrieve requests after being retrieved by a ReceiveMessage request.
-			VisibilityTimeout: 30,
-
-			MessageAttributeNames: []string{
-				contentTypeAttribute,
-				serviceAttribute,
-			},
-
-			AttributeNames: []types.QueueAttributeName{
-				// this type conversion is probably a bug in the SDK
-				types.QueueAttributeName(types.MessageSystemAttributeNameApproximateReceiveCount),
-			},
-		})
-		if err != nil {
+		if err := ww.FetchOnce(ctx); err != nil {
 			return err
 		}
+	}
+}
 
-		for _, msg := range out.Messages {
+func (ww *Worker) FetchOnce(ctx context.Context) error {
+	out, err := ww.SQSClient.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{
+		QueueUrl: &ww.QueueURL,
+
+		// Max = 10
+		MaxNumberOfMessages: 10,
+
+		// The duration (in seconds) for which the call waits for a message to arrive in
+		// the queue before returning.
+		WaitTimeSeconds: 5,
+
+		// The duration (in seconds) that the received messages are hidden from subsequent
+		// retrieve requests after being retrieved by a ReceiveMessage request.
+		VisibilityTimeout: 30,
+
+		MessageAttributeNames: []string{
+			contentTypeAttribute,
+			serviceAttribute,
+		},
+
+		AttributeNames: []types.QueueAttributeName{
+			// this type conversion is probably a bug in the SDK
+			types.QueueAttributeName(types.MessageSystemAttributeNameApproximateReceiveCount),
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	if len(out.Messages) == 0 {
+		log.Info(ctx, "no messages")
+	}
+
+	for _, msg := range out.Messages {
+
+		ww.handleMessage(ctx, msg)
+
+		if randomlySelected(ctx, ww.resendChance) {
 			ww.handleMessage(ctx, msg)
-
-			if randomlySelected(ctx, ww.resendChance) {
-				ww.handleMessage(ctx, msg)
-			}
 		}
 	}
+	return nil
 }
 
 const (
@@ -216,28 +281,34 @@ func getReceiveCount(msg types.Message) int {
 }
 
 func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
-	parsed, handler, err := ww.parseMessage(msg)
+	parsed, err := parseMessage(msg)
 	if err != nil {
 		// Leave it here, we need to retry
-		log.WithError(ctx, err).Error("failed to handle message")
+		log.WithError(ctx, err).Error("failed to parse message")
 		return
 	}
 
+	if parsed.ID == "" {
+		parsed.ID = uuid.NewSHA1(messageIDNamespace, []byte(parsed.SQSMessageID)).String()
+	}
+
 	ctx = log.WithFields(ctx, map[string]interface{}{
-		"grpc-service":   parsed.ServiceName,
-		"sqs-message-id": parsed.SQSMessageID,
+		"grpc-service":   parsed.GrpcService,
+		"grpc-method":    parsed.GrpcMethod,
+		"sqs-message-id": msg.MessageId,
 	})
+
+	fullServiceName := fmt.Sprintf("/%s/%s", parsed.GrpcService, parsed.GrpcMethod)
+	handler, ok := ww.services[fullServiceName]
+	if !ok {
+		log.Error(ctx, "no handler matched")
+		return
+	}
+
 	log.Debug(ctx, "begin handle message")
 
 	err = handler.HandleMessage(ctx, parsed)
 
-	// deadletter even if successful based on deadletterChance
-	if err == nil && randomlySelected(ctx, ww.deadletterChance) {
-		err := ww.killMessage(ctx, parsed, fmt.Errorf("sidecar deadletter chance selected this message to kill"))
-		if err != nil {
-			log.WithField(ctx, "killError", err.Error()).Error("Error selectively killing message, leaving in queue")
-		}
-	}
 	if err != nil {
 		ctx = log.WithError(ctx, err)
 		log.Error(ctx, "Error handling message")
@@ -266,17 +337,6 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	}
 }
 
-type Message struct {
-	Proto        proto.Message
-	ServiceName  string
-	SQSMessageID string
-	MessageID    string
-}
-
-type Handler interface {
-	HandleMessage(context.Context, *Message) error
-}
-
 type SNSMessageWrapper struct {
 	Type      string `json:"Type"`
 	Message   string `json:"Message"`
@@ -284,108 +344,110 @@ type SNSMessageWrapper struct {
 	TopicArn  string `json:"TopicArn"`
 }
 
-func (ss *service) parseMessageBody(contentType string, raw []byte) (proto.Message, error) {
-	if ss.customParser != nil {
-		return ss.customParser(raw)
-	}
-
-	msg := dynamicpb.NewMessage(ss.requestMessage)
-
-	if contentType == "" {
-		if raw[0] == '{' {
-			contentType = "application/json"
-			snsMessage := &SNSMessageWrapper{}
-			err := json.Unmarshal(raw, snsMessage)
-			if err == nil { // IF NO ERROR
-				raw = []byte(snsMessage.Message)
-			}
-
-		} else {
-			contentType = "application/protobuf"
-		}
-	}
-
-	switch contentType {
-	case "application/json":
-		if err := protojson.Unmarshal(raw, msg); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal json: %w", err)
-		}
-	case "application/protobuf":
-		msgBytes, err := base64.StdEncoding.DecodeString(string(raw))
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode base64: %w", err)
-		}
-
-		if err := proto.Unmarshal(msgBytes, msg); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal protobuf: %w", err)
-		}
-	default:
-		return nil, fmt.Errorf("unknown content type: %s", contentType)
-	}
-
-	return msg, nil
+type EventBridgeWrapper struct {
+	Detail       json.RawMessage `json:"detail"`
+	DetailType   string          `json:"detail-type"`
+	EventBusName string          `json:"eventBusName"`
+	Source       string          `json:"source"`
+	Account      string          `json:"account"`
+	Region       string          `json:"region"`
+	Resources    []string        `json:"resources"`
+	Time         string          `json:"time"`
 }
 
-func (ww *Worker) parseMessage(msg types.Message) (*Message, Handler, error) {
-	// Parse Message
-	var serviceName string
-	serviceNameAttributeValue, ok := msg.MessageAttributes[serviceAttribute]
-	if ok {
-		serviceName = *serviceNameAttributeValue.StringValue
-	} else {
-		serviceName = RawMessageName
-	}
+type O5Message struct {
+	ID                string            `json:"id"`
+	SQSMessageID      string            `json:"sqs-message-id"`
+	Message           []byte            `json:"body"`
+	Destination       string            `json:"topic-name"`
+	Headers           map[string]string `json:"headers"`
+	SourceEnvironment string            `json:"source-environment"`
+	ContentType       string            `json:"content-type"`
 
+	GrpcService string  `json:"grpc-service"`
+	GrpcMethod  string  `json:"grpc-method"`
+	GrpcMessage string  `json:"grpc-message"`
+	ReplyDest   *string `json:"reply-dest,omitempty"`
+}
+
+func parseMessage(msg types.Message) (*O5Message, error) {
+
+	body := []byte(*msg.Body)
+
+	// Parse Message
 	var contentType string
 	contentTypeAttributeValue, ok := msg.MessageAttributes[contentTypeAttribute]
 	if ok {
 		contentType = *contentTypeAttributeValue.StringValue
+	} else if len(body) > 0 && (body[0] == '{' || body[0] == '[') {
+		contentType = "application/json"
+	} else {
+		// fairly big assumption...
+		contentType = "application/protobuf"
 	}
 
-	service, ok := ww.services[serviceName]
-	if !ok {
-		return nil, nil, fmt.Errorf("no handler for service %s", serviceName)
+	serviceNameAttributeValue, ok := msg.MessageAttributes[serviceAttribute]
+	if ok && serviceNameAttributeValue.StringValue != nil {
+		serviceName := *serviceNameAttributeValue.StringValue
+		parts := strings.Split(serviceName, "/")
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("invalid service name: %s", serviceName)
+		}
+
+		if contentType == "application/json" {
+			snsWrapper := &SNSMessageWrapper{}
+			if err := json.Unmarshal([]byte(*msg.Body), snsWrapper); err == nil && snsWrapper.Message != "" {
+				body = []byte(snsWrapper.Message)
+
+			}
+		}
+
+		return &O5Message{
+			Message:      body,
+			SQSMessageID: *msg.MessageId,
+			GrpcService:  parts[1],
+			GrpcMethod:   parts[2],
+			ContentType:  contentType,
+		}, nil
 	}
 
-	var err error
-
-	parsed, err := service.parseMessageBody(contentType, []byte(*msg.Body))
-	if err != nil {
-		return nil, nil, fmt.Errorf("parsing message for service %s: %w", serviceName, err)
+	if contentType != "application/json" {
+		return nil, fmt.Errorf("unsupported content type: %s", contentType)
 	}
 
-	// TODO: Pass this through the message infra where possible
-	messageID := uuid.NewSHA1(messageIDNamespace, []byte(*msg.MessageId)).String()
+	// Try to parse various wrapper methods
+	wrapper := &EventBridgeWrapper{}
+	if err := json.Unmarshal([]byte(*msg.Body), wrapper); err == nil && wrapper.DetailType != "" {
+		switch wrapper.DetailType {
+		case "o5-message":
+			outboxMessage := &O5Message{}
+			if err := json.Unmarshal(wrapper.Detail, outboxMessage); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal o5-message: %w", err)
+			}
+			outboxMessage.SQSMessageID = *msg.MessageId
+			return outboxMessage, nil
 
-	return &Message{
-		Proto:        parsed,
-		ServiceName:  serviceName,
-		SQSMessageID: *msg.MessageId,
-		MessageID:    messageID,
-	}, service, nil
+		default:
+			return nil, fmt.Errorf("unknown event-bridge detail type: %s", wrapper.DetailType)
+		}
+
+	}
+
+	return nil, fmt.Errorf("unsupported message format")
 }
 
 var messageIDNamespace = uuid.MustParse("B71AFF66-460A-424C-8927-9AF8C9135BF9")
 
-func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error) error {
+func (ww *Worker) killMessage(ctx context.Context, msg *O5Message, killError error) error {
 	if ww.deadLetterHandler == nil {
 		return fmt.Errorf("no dead letter handler")
 	}
 
-	inputAny, err := anypb.New(msg.Proto)
-	if err != nil {
-		return fmt.Errorf("failed to marshal input message as ANY: %w", err)
-	}
-	inputJSON, err := protojson.Marshal(msg.Proto)
-	if err != nil {
-		return fmt.Errorf("failed to marshal input message as JSON: %w", err)
-	}
-
 	deadMessage := &dante_tpb.DeadMessage{
 		InfraMessageId: msg.SQSMessageID,
-		MessageId:      msg.MessageID,
+		MessageId:      msg.ID,
 		QueueName:      ww.QueueURL,
-		GrpcName:       msg.ServiceName,
+		GrpcName:       fmt.Sprintf("/%s/%s", msg.GrpcService, msg.GrpcMethod),
 		Timestamp:      timestamppb.Now(),
 		Problem: &dante_pb.Problem{
 			Type: &dante_pb.Problem_UnhandledError{
@@ -395,8 +457,10 @@ func (ww *Worker) killMessage(ctx context.Context, msg *Message, killError error
 			},
 		},
 		Payload: &dante_pb.Any{
-			Proto: inputAny,
-			Json:  string(inputJSON),
+			Proto: &anypb.Any{
+				TypeUrl: fmt.Sprintf("type.googleapis.com/%s", msg.GrpcMessage),
+				Value:   msg.Message,
+			},
 		},
 	}
 	if err := ww.deadLetterHandler.SendOne(ctx, deadMessage); err != nil {
