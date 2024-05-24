@@ -13,14 +13,14 @@ require (
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
-	github.com/pentops/dante v0.0.0-20240523013431-de980b0b8507
-	github.com/pentops/flowtest v0.0.0-20240510221023-0114d43723cb
-	github.com/pentops/jsonapi v0.0.0-20240523004818-24c4981f04da
-	github.com/pentops/jwtauth v0.0.0-20231218034817-a97d0d7fe8cc
-	github.com/pentops/log.go v0.0.0-20231218074934-67aedcab3fa4
-	github.com/pentops/o5-go v0.0.0-20240522235906-43476a9e56ca
-	github.com/pentops/runner v0.0.0-20240423175422-9ce56dcd8e33
-	github.com/pentops/sqrlx.go v0.0.0-20240108202916-8687fdf983c0
+	github.com/pentops/dante v0.0.0-20240523171815-3a3141d4d831
+	github.com/pentops/flowtest v0.0.0-20240524171423-0780fa0e16ca
+	github.com/pentops/jsonapi v0.0.0-20240524220353-ee5dd68502a9
+	github.com/pentops/jwtauth v0.0.0-20240523172427-effd1f0a6fb5
+	github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db
+	github.com/pentops/o5-go v0.0.0-20240524011757-4ac7caa3ad01
+	github.com/pentops/runner v0.0.0-20240523172258-f2337036dbd5
+	github.com/pentops/sqrlx.go v0.0.0-20240523172712-b615a994d8c0
 	github.com/rs/cors v1.10.1
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240509183442-62759503f434
@@ -56,8 +56,8 @@ require (
 	github.com/jhump/protoreflect v1.16.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/pentops/outbox.pg.go v0.0.0-20231222014950-493c01cfbcc7 // indirect
-	github.com/pentops/protostate v0.0.0-20240522235950-fe9b5da179f8 // indirect
+	github.com/pentops/outbox.pg.go v0.0.0-20240523172517-f5abd3a124ee // indirect
+	github.com/pentops/protostate v0.0.0-20240523172014-39dbd9085078 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
