@@ -249,11 +249,15 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 			return fmt.Errorf("error in outbox rows: %w", err)
 		}
 
+		if count == 0 {
+			return nil
+		}
+
 		// NOTE: Error handling from here is out of usual order.
 
 		successIDs, sendError := callback.SendMultiBatch(ctx, messages)
 
-		_, txError := tx.Exec(ctx, sq.
+		_, deleteError := tx.Exec(ctx, sq.
 			Delete("outbox").
 			Where("id = ANY(?)", pq.Array(successIDs)))
 
@@ -261,8 +265,8 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 			return fmt.Errorf("error sending batch of outbox messages: %w", sendError)
 		}
 
-		if txError != nil {
-			return fmt.Errorf("error deleting sent outbox messages: %w", txError)
+		if deleteError != nil {
+			return fmt.Errorf("error deleting sent outbox messages: %w", deleteError)
 		}
 
 		return nil
