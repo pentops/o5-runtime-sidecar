@@ -51,6 +51,10 @@ func (ta TestAWS) SQS() SQSAPI {
 	return nil
 }
 
+func (ta TestAWS) EventBridge() EventBridgeAPI {
+	return nil
+}
+
 func TestLoader(t *testing.T) {
 
 	runtime, err := FromConfig(Config{}, TestAWS{})

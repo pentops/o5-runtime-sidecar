@@ -9,6 +9,7 @@ import (
 
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
+	"github.com/pentops/o5-runtime-sidecar/adapter"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
@@ -21,7 +22,7 @@ var NothingToDoError = errors.New("no services configured")
 
 type Runtime struct {
 	queueWorker     *sqslink.Worker
-	sender          *outbox.SNSBatcher
+	sender          Sender
 	jwks            *jwks.JWKSManager
 	adapter         *adapterServer
 	routerServer    *routerServer
@@ -29,6 +30,12 @@ type Runtime struct {
 
 	connections []io.Closer
 	endpoints   []string
+}
+
+type Sender interface {
+	outbox.Batcher
+	sqslink.DeadLetterHandler
+	adapter.Sender
 }
 
 func NewRuntime() *Runtime {

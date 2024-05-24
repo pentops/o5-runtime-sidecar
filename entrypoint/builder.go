@@ -27,13 +27,15 @@ type Config struct {
 
 	PostgresOutboxURI []string `env:"POSTGRES_OUTBOX" default:""`
 	SNSPrefix         string   `env:"SNS_PREFIX" default:""`
+	EventBridgeARN    string   `env:"EVENTBRIDGE_ARN" default:""`
+	AppName           string   `env:"APP_NAME" default:""`
+	EnvironmentName   string   `env:"ENVIRONMENT_NAME" default:""`
 
 	CORSOrigins []string `env:"CORS_ORIGINS" default:""`
 
 	JWKS []string `env:"JWKS" default:""`
 
-	ResendChance     int `env:"RESEND_CHANCE" required:"false"`
-	DeadletterChance int `env:"DEADLETTER_CHANCE" required:"false"`
+	ResendChance int `env:"RESEND_CHANCE" required:"false"`
 
 	NoDeadLetters bool `env:"NO_DEADLETTERS" default:"false"`
 }
@@ -42,7 +44,16 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	rt := NewRuntime()
 	rt.endpoints = envConfig.ServiceEndpoints
 
-	if envConfig.SNSPrefix != "" {
+	if envConfig.EventBridgeARN != "" {
+		if envConfig.AppName == "" {
+			return nil, fmt.Errorf("APP_NAME is required when using eventbridge")
+		}
+		if envConfig.EnvironmentName == "" {
+			return nil, fmt.Errorf("ENVIRONMENT_NAME is required when using eventbridge")
+		}
+
+		rt.sender = outbox.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeARN, envConfig.AppName, envConfig.EnvironmentName)
+	} else if envConfig.SNSPrefix != "" {
 		rt.sender = outbox.NewSNSBatcher(awsConfig.SNS(), envConfig.SNSPrefix)
 	}
 
@@ -66,11 +77,11 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		var sender sqslink.DeadLetterHandler
 		if !envConfig.NoDeadLetters {
 			if rt.sender == nil {
-				return nil, fmt.Errorf("outbox requires a sender (set SNS_PREFIX)")
+				return nil, fmt.Errorf("outbox requires a sender (set SNS_PREFIX or EVENTBRIDGE_ARN)")
 			}
 			sender = rt.sender
 		}
-		rt.queueWorker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, sender, envConfig.ResendChance, envConfig.DeadletterChance)
+		rt.queueWorker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, sender, envConfig.ResendChance)
 	}
 
 	if envConfig.AdapterAddr != "" {

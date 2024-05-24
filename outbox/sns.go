@@ -85,29 +85,63 @@ type snsMessage struct {
 	attributes map[string]types.MessageAttributeValue
 }
 
-func mapToHeaders(attrs map[string][]string) map[string]types.MessageAttributeValue {
+func mapToHeaders(msg *Message) map[string]types.MessageAttributeValue {
 	attributes := map[string]types.MessageAttributeValue{}
-	for key, vals := range attrs {
-		for _, val := range vals {
-			if val == "" {
-				continue
-			}
-			attributes[key] = types.MessageAttributeValue{
-				StringValue: aws.String(val),
-				DataType:    aws.String("String"),
-			}
+	for key, val := range msg.Headers {
+		if val == "" {
+			continue
+		}
+		attributes[key] = types.MessageAttributeValue{
+			StringValue: aws.String(val),
+			DataType:    aws.String("String"),
 		}
 	}
+	attributes["grpc-service"] = types.MessageAttributeValue{
+		StringValue: aws.String(fmt.Sprintf("/%s/%s", msg.GrpcService, msg.GrpcMethod)),
+		DataType:    aws.String("String"),
+	}
+	attributes["grpc-message"] = types.MessageAttributeValue{
+		StringValue: aws.String(msg.GrpcMessage),
+		DataType:    aws.String("String"),
+	}
+	if msg.ReplyDest != nil {
+		attributes["o5-reply-reply-to"] = types.MessageAttributeValue{
+			StringValue: aws.String(*msg.ReplyDest),
+			DataType:    aws.String("String"),
+		}
+	}
+
 	return attributes
 }
 
 func encodeMessage(msg *Message) *snsMessage {
 	body := base64.StdEncoding.EncodeToString(msg.Message)
-	attributes := mapToHeaders(msg.Headers)
+	attributes := mapToHeaders(msg)
+
 	return &snsMessage{
 		body:       body,
 		attributes: attributes,
 	}
+}
+
+func (b *SNSBatcher) SendMultiBatch(ctx context.Context, msgs []*Message) ([]string, error) {
+
+	byDestination := map[string][]*Message{}
+	successIDs := []string{}
+
+	for _, msg := range msgs {
+		byDestination[msg.Destination] = append(byDestination[msg.Destination], msg)
+	}
+
+	for destination, messages := range byDestination {
+		if err := b.SendBatch(ctx, destination, messages); err != nil {
+			return nil, fmt.Errorf("error sending batch of outbox messages: %w", err)
+		}
+		for _, msg := range messages {
+			successIDs = append(successIDs, msg.ID)
+		}
+	}
+	return successIDs, nil
 }
 
 func (b *SNSBatcher) SendBatch(ctx context.Context, destination string, msgs []*Message) error {
