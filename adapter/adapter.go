@@ -5,38 +5,30 @@ import (
 	"fmt"
 
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
-	"github.com/pentops/o5-runtime-sidecar/outbox"
+	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type Sender interface {
-	SendMarshalled(ctx context.Context, msg outbox.MarshalledMessage) error
-}
-
 type MessageBridge struct {
-	sender Sender
+	publisher awsmsg.Publisher
 	messaging_tpb.UnimplementedMessageBridgeTopicServer
+	source awsmsg.SourceConfig
 }
 
-func NewMessageBridge(sender Sender) *MessageBridge {
+func NewMessageBridge(publisher awsmsg.Publisher, source awsmsg.SourceConfig) *MessageBridge {
 	return &MessageBridge{
-		sender: sender,
+		publisher: publisher,
+		source:    source,
 	}
 }
 
 func (mb *MessageBridge) Send(ctx context.Context, req *messaging_tpb.SendMessage) (*emptypb.Empty, error) {
-	headers := map[string]string{}
-	for _, header := range req.Headers {
-		headers[header.Key] = header.Value
-	}
+	msg := req.Message
 
-	msg := outbox.MarshalledMessage{
-		Body:    req.Payload,
-		Headers: headers,
-		Topic:   req.Destination,
-	}
+	msg.SourceApp = mb.source.SourceApp
+	msg.SourceEnv = mb.source.SourceEnv
 
-	if err := mb.sender.SendMarshalled(ctx, msg); err != nil {
+	if err := mb.publisher.Publish(ctx, msg); err != nil {
 		return nil, fmt.Errorf("couldn't send marshalled msg: %w", err)
 	}
 	return &emptypb.Empty{}, nil

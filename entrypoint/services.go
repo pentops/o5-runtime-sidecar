@@ -11,6 +11,7 @@ import (
 	"github.com/pentops/o5-go/auth/v1/auth_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/adapter"
+	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -25,8 +26,8 @@ type adapterServer struct {
 	listening chan struct{}
 }
 
-func newAdapterServer(bind string, sender adapter.Sender) *adapterServer {
-	messageBridge := adapter.NewMessageBridge(sender)
+func newAdapterServer(bind string, sender awsmsg.Publisher, source awsmsg.SourceConfig) *adapterServer {
+	messageBridge := adapter.NewMessageBridge(sender, source)
 	server := grpc.NewServer()
 	messaging_tpb.RegisterMessageBridgeTopicServer(server, messageBridge)
 	reflection.Register(server)
@@ -177,19 +178,22 @@ func (hs *routerServer) Addr() string {
 }
 
 type outboxListener struct {
-	Name    string
-	uri     string
-	batcher outbox.Batcher
+	Name string
+	*outbox.Listener
 }
 
-func newOutboxListener(name, uri string, batcher outbox.Batcher) *outboxListener {
-	return &outboxListener{
-		Name:    name,
-		uri:     uri,
-		batcher: batcher,
+func newOutboxListener(name string, uri string, batcher outbox.Batcher, source awsmsg.SourceConfig) (*outboxListener, error) {
+	ll, err := outbox.NewListener(uri, batcher, source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create outbox listener: %w", err)
 	}
+
+	return &outboxListener{
+		Name:     name,
+		Listener: ll,
+	}, nil
 }
 
 func (ol *outboxListener) Run(ctx context.Context) error {
-	return outbox.Listen(ctx, ol.uri, ol.batcher)
+	return ol.Listener.Listen(ctx)
 }
