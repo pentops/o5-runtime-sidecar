@@ -1,4 +1,4 @@
-package outbox
+package awsmsg
 
 import (
 	"context"
@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/google/uuid"
+	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
+	"github.com/stretchr/testify/assert"
 )
 
 type MockEventBridgeAPI struct {
@@ -38,17 +40,23 @@ func TestEventBridge(t *testing.T) {
 		},
 	}
 
-	publisher := NewEventBridgePublisher(eventbridgeClient, "EVENTBRIDGE_ARN", "SOURCE", "ENV")
+	publisher := NewEventBridgePublisher(eventbridgeClient, "EVENTBRIDGE_ARN")
 
 	ctx := context.Background()
-	res, err := publisher.SendMultiBatch(ctx, []*Message{{
-		ID:          "message-id",
-		Message:     []byte("test"),
-		Destination: "test-topic",
-		GrpcService: "o5.deployer.v1.topic.CloudFormationRequestTopic",
-		GrpcMethod:  "Test",
-		GrpcMessage: "test.v1.TestMessage",
-		ContentType: "application/proto",
+	res, err := publisher.PublishBatch(ctx, []*messaging_pb.Message{{
+		MessageId: "message-id",
+		Body: &messaging_pb.Any{
+			TypeUrl: "type.googleapis.com/o5.deployer.v1.topic.CloudFormationRequestMessage",
+			Value:   []byte("test"),
+		},
+		DestinationTopic: "test-topic",
+		GrpcService:      "o5.deployer.v1.topic.CloudFormationRequestTopic",
+		GrpcMethod:       "Test",
+		SourceApp:        "SOURCE",
+		SourceEnv:        "ENV",
+		Headers: map[string]string{
+			"key": "val",
+		},
 	}})
 	if err != nil {
 		t.Fatal(err.Error())
@@ -68,25 +76,21 @@ func TestEventBridge(t *testing.T) {
 
 	entry := gotEntries[0]
 
-	if *entry.Source != "SOURCE" {
-		t.Fatalf("expected SOURCE, got %s", *entry.Source)
-	}
+	assert.NotNil(t, entry.Source)
+	assert.Equal(t, "o5/ENV/SOURCE", *entry.Source)
 
-	if *entry.DetailType != "o5-message" {
-		t.Fatalf("expected o5-message, got %s", *entry.DetailType)
-	}
+	assert.NotNil(t, entry.DetailType)
+	assert.Equal(t, "o5-message/v1", *entry.DetailType)
 
-	if *entry.EventBusName != "EVENTBRIDGE_ARN" {
-		t.Fatalf("expected EVENTBRIDGE_ARN, got %s", *entry.EventBusName)
-	}
+	assert.NotNil(t, entry.EventBusName)
+	assert.Equal(t, "EVENTBRIDGE_ARN", *entry.EventBusName)
 
 	detail := map[string]interface{}{}
 	if err := json.Unmarshal([]byte(*entry.Detail), &detail); err != nil {
 		t.Fatal(err.Error())
 	}
 
-	if detail["grpc-service"] != "o5.deployer.v1.topic.CloudFormationRequestTopic" {
-		t.Fatalf("expected o5.deployer.v1.topic.CloudFormationRequestTopic, got %s", detail["grpc-service"])
-	}
+	assert.Equal(t, "Test", detail["grpcMethod"])
+	assert.Equal(t, "o5.deployer.v1.topic.CloudFormationRequestTopic", detail["grpcService"])
 
 }

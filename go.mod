@@ -14,17 +14,17 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/pentops/dante v0.0.0-20240523171815-3a3141d4d831
-	github.com/pentops/flowtest v0.0.0-20240524171423-0780fa0e16ca
-	github.com/pentops/jsonapi v0.0.0-20240524220353-ee5dd68502a9
+	github.com/pentops/flowtest v0.0.0-20240525161451-19748de5798c
+	github.com/pentops/jsonapi v0.0.0-20240526154609-711edd4f8e6e
 	github.com/pentops/jwtauth v0.0.0-20240523172427-effd1f0a6fb5
 	github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db
-	github.com/pentops/o5-go v0.0.0-20240524011757-4ac7caa3ad01
-	github.com/pentops/runner v0.0.0-20240523172258-f2337036dbd5
+	github.com/pentops/o5-go v0.0.0-20240528195917-c3143ac171a2
+	github.com/pentops/runner v0.0.0-20240525192419-d655233635e9
 	github.com/pentops/sqrlx.go v0.0.0-20240523172712-b615a994d8c0
 	github.com/rs/cors v1.10.1
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20240509183442-62759503f434
-	google.golang.org/grpc v1.63.2
+	google.golang.org/genproto/googleapis/api v0.0.0-20240520151616-dc85e6b867a5
+	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.1
 	gopkg.daemonl.com/envconf v0.0.0-20220909014755-d65ec77bd452
 	gopkg.in/square/go-jose.v2 v2.6.0
@@ -67,6 +67,6 @@ require (
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240509183442-62759503f434 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240515191416-fc5f0ca64291 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

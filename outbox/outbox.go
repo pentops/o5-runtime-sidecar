@@ -5,112 +5,49 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
-	"strings"
 	"time"
 
 	sq "github.com/elgris/sqrl"
 	"github.com/lib/pq"
 	"github.com/pentops/log.go/log"
+	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/sqrlx.go/sqrlx"
+
+	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 )
 
-type Message struct {
-	ID                string            `json:"id"`
-	Message           []byte            `json:"body"`
-	Destination       string            `json:"topic-name"`
-	Headers           map[string]string `json:"headers"`
-	SourceEnvironment string            `json:"source-environment"`
-	ContentType       string            `json:"content-type"`
-
-	GrpcService string  `json:"grpc-service"`
-	GrpcMethod  string  `json:"grpc-method"`
-	GrpcMessage string  `json:"grpc-message"`
-	ReplyDest   *string `json:"reply-dest,omitempty"`
-}
-
-func (msg *Message) expandAndValidate() error {
-	for k, v := range msg.Headers {
-		v := v
-		if k == "grpc-service" {
-			msg.GrpcService = v
-			delete(msg.Headers, k)
-			continue
-		}
-		if k == "grpc-method" {
-			msg.GrpcMethod = v
-			delete(msg.Headers, k)
-			continue
-		}
-		if k == "grpc-message" {
-			msg.GrpcMessage = v
-			delete(msg.Headers, k)
-			continue
-		}
-		if k == "content-type" {
-			msg.ContentType = v
-			delete(msg.Headers, k)
-			continue
-		}
-		if k == "o5-reply-reply-to" {
-			msg.ReplyDest = &v
-			delete(msg.Headers, k)
-			continue
-		}
-	}
-
-	if msg.GrpcMessage == "" {
-		return fmt.Errorf("grpc-message header missing from outbox message")
-	}
-
-	if msg.GrpcService == "" {
-		return fmt.Errorf("grpc-service header missing from outbox message")
-	}
-
-	parts := strings.Split(msg.GrpcService, "/")
-	if len(parts) == 2 && parts[0] == "" {
-		// '/package.service'
-		parts = []string{parts[1]}
-	}
-	if len(parts) == 1 {
-		// 'package.service'
-		if msg.GrpcMethod == "" {
-			return fmt.Errorf("grpc-service header should be /package.service/method, or grpc-method should be set. %s", msg.GrpcService)
-		}
-	} else {
-		// '/package.service/method'
-		if len(parts) != 3 || parts[0] != "" {
-			return fmt.Errorf("grpc-service header has wrong format, should be /package.service/method, or just package.service with grpc-method set : %s", msg.GrpcService)
-		}
-		if msg.GrpcMethod == "" {
-			msg.GrpcMethod = parts[2]
-		} else if msg.GrpcMethod != parts[2] {
-			return fmt.Errorf("grpc-service header specified as /package.service/method, but grpc-method did not match: %s %s", msg.GrpcService, msg.GrpcMethod)
-		}
-
-		msg.GrpcService = parts[1]
-	}
-
-	return nil
-}
-
 type Batcher interface {
-	SendMultiBatch(ctx context.Context, messages []*Message) ([]string, error)
+	PublishBatch(ctx context.Context, messages []*messaging_pb.Message) ([]string, error)
 }
 
-func Listen(ctx context.Context, url string, callback Batcher) error {
-	_, err := pq.ParseURL(url)
+type Listener struct {
+	dbURL     string
+	source    awsmsg.SourceConfig
+	publisher Batcher
+}
+
+func NewListener(dbURL string, publisher Batcher, sourceConfig awsmsg.SourceConfig) (*Listener, error) {
+	_, err := pq.ParseURL(dbURL)
 	if err != nil {
 		// the URL can contain secrets, so we don't want to log it... but it
 		// does make debugging difficult.
-		return fmt.Errorf("parsing postgres URL: %w", err)
+		return nil, fmt.Errorf("parsing postgres URL: %w", err)
 	}
+	return &Listener{
+		dbURL:     dbURL,
+		source:    sourceConfig,
+		publisher: publisher,
+	}, nil
+}
 
-	db, err := sql.Open("postgres", url)
+func (ll *Listener) Listen(ctx context.Context) error {
+
+	db, err := sql.Open("postgres", ll.dbURL)
 	if err != nil {
 		return err
 	}
 
-	pqListener := pq.NewListener(url, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
+	pqListener := pq.NewListener(ll.dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
 		if err != nil {
 			log.WithError(ctx, err).Error("error in listener")
 		}
@@ -139,7 +76,7 @@ func Listen(ctx context.Context, url string, callback Batcher) error {
 		return err
 	}
 
-	ll := listener{
+	runner := looper{
 		db:       dbWrapped,
 		listener: pqListener,
 	}
@@ -148,12 +85,12 @@ func Listen(ctx context.Context, url string, callback Batcher) error {
 		return err
 	}
 
-	if err := ll.loopUntilEmpty(ctx, callback); err != nil {
+	if err := runner.loopUntilEmpty(ctx, ll.rowsCallback); err != nil {
 		return err
 	}
 
 	for range pqListener.NotificationChannel() {
-		err := ll.loopUntilEmpty(ctx, callback)
+		err := runner.loopUntilEmpty(ctx, ll.rowsCallback)
 		if err != nil {
 			return err
 		}
@@ -162,12 +99,74 @@ func Listen(ctx context.Context, url string, callback Batcher) error {
 	return nil
 }
 
-type listener struct {
+func (ll *Listener) rowsCallback(ctx context.Context, rows []outboxRow) ([]string, error) {
+	msgs := make([]*messaging_pb.Message, len(rows))
+	for idx, row := range rows {
+		msg, err := parseOutboxMessage(row, ll.source)
+		if err != nil {
+			return nil, err
+		}
+
+		msgs[idx] = msg
+	}
+
+	return ll.publisher.PublishBatch(ctx, msgs)
+}
+
+func parseOutboxMessage(row outboxRow, source awsmsg.SourceConfig) (*messaging_pb.Message, error) {
+
+	headers, err := url.ParseQuery(row.header)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing headers from outbox message: %w", err)
+	}
+	simpleHeaders := map[string]string{}
+	for k, v := range headers {
+		simpleHeaders[k] = v[0]
+	}
+
+	protoMessageName, ok := simpleHeaders["grpc-message"]
+	if !ok || protoMessageName == "" {
+		return nil, fmt.Errorf("grpc-message header missing from outbox message")
+	}
+	delete(simpleHeaders, "grpc-message")
+
+	protoServiceName, ok := simpleHeaders["grpc-service"]
+	if !ok || protoServiceName == "" {
+		return nil, fmt.Errorf("grpc-service header missing from outbox message")
+	}
+	delete(simpleHeaders, "grpc-service")
+
+	msg := &messaging_pb.Message{
+		MessageId:        row.id,
+		DestinationTopic: row.destination,
+		GrpcMethod:       protoServiceName,
+		SourceApp:        source.SourceApp,
+		SourceEnv:        source.SourceEnv,
+		Headers:          simpleHeaders,
+		Body: &messaging_pb.Any{
+			TypeUrl: fmt.Sprintf("type.googleapis.com/%s", protoMessageName),
+			Value:   row.message,
+		},
+		ReplyDest: nil,
+	}
+
+	replyTo, ok := simpleHeaders["o5-reply-reply-to"]
+	if ok {
+		msg.ReplyDest = &replyTo
+		delete(simpleHeaders, "o5-reply-reply-to")
+	}
+
+	return msg, nil
+}
+
+type looper struct {
 	listener *pq.Listener
 	db       *sqrlx.Wrapper
 }
 
-func (ll listener) loopUntilEmpty(ctx context.Context, callback Batcher) error {
+type pageCallback func(ctx context.Context, rows []outboxRow) ([]string, error)
+
+func (ll looper) loopUntilEmpty(ctx context.Context, callback pageCallback) error {
 	for {
 		count, err := ll.doPage(ctx, callback)
 		if err != nil {
@@ -179,7 +178,14 @@ func (ll listener) loopUntilEmpty(ctx context.Context, callback Batcher) error {
 	}
 }
 
-func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
+type outboxRow struct {
+	id          string
+	destination string
+	message     []byte
+	header      string
+}
+
+func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error) {
 	qq := sq.Select(
 		"id",
 		"destination",
@@ -205,44 +211,24 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 
 		defer rows.Close()
 
-		messages := []*Message{}
+		msgRows := []outboxRow{}
 
 		for rows.Next() {
 			count++
-			var id, destination string
-			var message []byte
-			var headerString string
+
+			var row outboxRow
 
 			if err := rows.Scan(
-				&id,
-				&destination,
-				&message,
-				&headerString,
+				&row.id,
+				&row.destination,
+				&row.message,
+				&row.header,
 			); err != nil {
 				return fmt.Errorf("error scanning outbox row: %w", err)
 			}
 
-			headers, err := url.ParseQuery(headerString)
-			if err != nil {
-				return fmt.Errorf("error parsing headers from outbox message: %w", err)
-			}
-			simpleHeaders := map[string]string{}
-			for k, v := range headers {
-				simpleHeaders[k] = v[0]
-			}
+			msgRows = append(msgRows, row)
 
-			msg := &Message{
-				ID:          id,
-				Message:     message,
-				Headers:     simpleHeaders,
-				Destination: destination,
-			}
-
-			if err := msg.expandAndValidate(); err != nil {
-				return err
-			}
-
-			messages = append(messages, msg)
 		}
 
 		if err := rows.Err(); err != nil {
@@ -255,7 +241,7 @@ func (ll listener) doPage(ctx context.Context, callback Batcher) (int, error) {
 
 		// NOTE: Error handling from here is out of usual order.
 
-		successIDs, sendError := callback.SendMultiBatch(ctx, messages)
+		successIDs, sendError := callback(ctx, msgRows)
 
 		res, deleteError := tx.Delete(ctx, sq.
 			Delete("outbox").

@@ -9,8 +9,7 @@ import (
 
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/adapter"
-	"github.com/pentops/o5-runtime-sidecar/outbox"
+	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/protoread"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/pentops/runner"
@@ -22,7 +21,7 @@ var NothingToDoError = errors.New("no services configured")
 
 type Runtime struct {
 	queueWorker     *sqslink.Worker
-	sender          Sender
+	sender          awsmsg.Publisher
 	jwks            *jwks.JWKSManager
 	adapter         *adapterServer
 	routerServer    *routerServer
@@ -30,12 +29,6 @@ type Runtime struct {
 
 	connections []io.Closer
 	endpoints   []string
-}
-
-type Sender interface {
-	outbox.Batcher
-	sqslink.DeadLetterHandler
-	adapter.Sender
 }
 
 func NewRuntime() *Runtime {
@@ -120,7 +113,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 
 func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error {
 
-	conn, err := grpc.DialContext(ctx, endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return fmt.Errorf("dial: %w", err)
 	}

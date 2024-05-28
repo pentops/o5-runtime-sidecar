@@ -8,8 +8,8 @@ import (
 	"github.com/pentops/jsonapi/gen/j5/source/v1/source_j5pb"
 	"github.com/pentops/jsonapi/proxy"
 	"github.com/pentops/jwtauth/jwks"
+	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"
-	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/rs/cors"
 )
@@ -44,6 +44,11 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	rt := NewRuntime()
 	rt.endpoints = envConfig.ServiceEndpoints
 
+	srcConfig := awsmsg.SourceConfig{
+		SourceApp: envConfig.AppName,
+		SourceEnv: envConfig.EnvironmentName,
+	}
+
 	if envConfig.EventBridgeARN != "" {
 		if envConfig.AppName == "" {
 			return nil, fmt.Errorf("APP_NAME is required when using eventbridge")
@@ -52,9 +57,9 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 			return nil, fmt.Errorf("ENVIRONMENT_NAME is required when using eventbridge")
 		}
 
-		rt.sender = outbox.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeARN, envConfig.AppName, envConfig.EnvironmentName)
+		rt.sender = awsmsg.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeARN)
 	} else if envConfig.SNSPrefix != "" {
-		rt.sender = outbox.NewSNSBatcher(awsConfig.SNS(), envConfig.SNSPrefix)
+		rt.sender = awsmsg.NewSNSPublisher(awsConfig.SNS(), envConfig.SNSPrefix)
 	}
 
 	if len(envConfig.PostgresOutboxURI) > 0 {
@@ -68,7 +73,11 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 			if len(envConfig.PostgresOutboxURI) > 1 {
 				name = fmt.Sprintf("outbox-%s", uri)
 			}
-			rt.outboxListeners = append(rt.outboxListeners, newOutboxListener(name, uri, rt.sender))
+			listener, err := newOutboxListener(name, uri, rt.sender, srcConfig)
+			if err != nil {
+				return nil, fmt.Errorf("creating outbox listener: %w", err)
+			}
+			rt.outboxListeners = append(rt.outboxListeners, listener)
 		}
 
 	}
@@ -79,7 +88,8 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 			if rt.sender == nil {
 				return nil, fmt.Errorf("outbox requires a sender (set SNS_PREFIX or EVENTBRIDGE_ARN)")
 			}
-			sender = rt.sender
+
+			sender = sqslink.NewO5MessageDeadLetterHandler(rt.sender, srcConfig)
 		}
 		rt.queueWorker = sqslink.NewWorker(awsConfig.SQS(), envConfig.SQSURL, sender, envConfig.ResendChance)
 	}
@@ -88,7 +98,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		if rt.sender == nil {
 			return nil, fmt.Errorf("adapter requires a sender")
 		}
-		rt.adapter = newAdapterServer(envConfig.AdapterAddr, rt.sender)
+		rt.adapter = newAdapterServer(envConfig.AdapterAddr, rt.sender, srcConfig)
 	}
 
 	if len(envConfig.JWKS) > 0 {
