@@ -199,8 +199,20 @@ func getReceiveCount(msg types.Message) int {
 func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	parsed, err := awsmsg.ParseSQSMessage(msg)
 	if err != nil {
-		// Leave it here, we need to retry
+		// Leave it for retry unless we keep failing at parsing it
 		log.WithError(ctx, err).Error("failed to parse message")
+
+		if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
+			log.WithError(ctx, err).Error("failed to parse message, leaving in queue")
+			return
+		}
+		err := ww.killMessage(ctx, parsed, msg, err)
+		if err != nil {
+			log.WithField(ctx, "killError", err.Error()).Error("Error killing unparsable message, leaving in queue")
+			return
+		}
+		log.Info(ctx, "Killed due to parsing issues")
+
 		return
 	}
 
