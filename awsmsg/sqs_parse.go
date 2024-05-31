@@ -48,7 +48,6 @@ var SQSMessageAttributes = []string{
 }
 
 func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
-
 	serviceNameAttributeValue, ok := msg.MessageAttributes[serviceAttribute]
 	if ok && serviceNameAttributeValue.StringValue != nil {
 		return parseServiceMessage(msg, *serviceNameAttributeValue.StringValue)
