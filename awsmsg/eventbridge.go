@@ -22,14 +22,18 @@ type EventBridgeAPI interface {
 
 type EventBridgePublisher struct {
 	client EventBridgeAPI
-	BusARN string
+	busARN string
 }
 
 func NewEventBridgePublisher(client EventBridgeAPI, busARN string) *EventBridgePublisher {
 	return &EventBridgePublisher{
 		client: client,
-		BusARN: busARN,
+		busARN: busARN,
 	}
+}
+
+func (p *EventBridgePublisher) PublisherID() string {
+	return p.busARN
 }
 
 func (p *EventBridgePublisher) Publish(ctx context.Context, message *messaging_pb.Message) error {
@@ -67,10 +71,10 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 		request := messages[idx]
 		if entry.ErrorCode != nil {
 			log.WithFields(ctx, map[string]interface{}{
-				"event_bus_arn": p.BusARN,
-				"message_id":    request.MessageId,
-				"error_code":    *entry.ErrorCode,
-				"error_message": *entry.ErrorMessage,
+				"eventBusArn":  p.busARN,
+				"messageId":    request.MessageId,
+				"errorCode":    *entry.ErrorCode,
+				"errorMessage": *entry.ErrorMessage,
 			}).Error("Failed to PutEvent to EventBus")
 			if firstError == nil {
 				firstError = fmt.Errorf("failed to send event %s: %s %s", request.MessageId, *entry.ErrorCode, *entry.ErrorMessage)
@@ -79,8 +83,8 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 		}
 
 		log.WithFields(ctx, map[string]interface{}{
-			"event_bus_arn": p.BusARN,
-			"message_id":    request.MessageId,
+			"eventBusArn": p.busARN,
+			"messageId":   request.MessageId,
 		}).Info("Published to EventBus")
 
 		successfulIDs = append(successfulIDs, request.MessageId)
@@ -103,7 +107,7 @@ func (p *EventBridgePublisher) prepareMessage(input *messaging_pb.Message) (*typ
 		Detail:       aws.String(string(detai)),
 		DetailType:   aws.String(EventBridgeO5MessageDetailType),
 		Source:       aws.String(source),
-		EventBusName: aws.String(p.BusARN),
+		EventBusName: aws.String(p.busARN),
 	}
 
 	return entry, nil
