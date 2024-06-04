@@ -7,6 +7,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
+	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -65,11 +66,22 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 	for idx, entry := range res.Entries {
 		request := messages[idx]
 		if entry.ErrorCode != nil {
+			log.WithFields(ctx, map[string]interface{}{
+				"event_bus_arn": p.BusARN,
+				"message_id":    request.MessageId,
+				"error_code":    *entry.ErrorCode,
+				"error_message": *entry.ErrorMessage,
+			}).Error("Failed to PutEvent to EventBus")
 			if firstError == nil {
 				firstError = fmt.Errorf("failed to send event %s: %s %s", request.MessageId, *entry.ErrorCode, *entry.ErrorMessage)
 			}
 			continue
 		}
+
+		log.WithFields(ctx, map[string]interface{}{
+			"event_bus_arn": p.BusARN,
+			"message_id":    request.MessageId,
+		}).Info("Published to EventBus")
 
 		successfulIDs = append(successfulIDs, request.MessageId)
 	}
