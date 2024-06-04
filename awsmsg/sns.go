@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sns/types"
+	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 )
 
@@ -27,6 +28,10 @@ func NewSNSPublisher(client SNSAPI, topicARN string) *SNSPublisher {
 		client:   client,
 		topicARN: topicARN,
 	}
+}
+
+func (p *SNSPublisher) PublisherID() string {
+	return p.topicARN
 }
 
 func prepareSNSMessage(msg *messaging_pb.Message) types.PublishBatchRequestEntry {
@@ -86,10 +91,9 @@ func (p *SNSPublisher) Publish(ctx context.Context, message *messaging_pb.Messag
 	prepared := prepareSNSMessage(message)
 
 	input := &sns.PublishInput{
-		Message:                prepared.Message,
-		TopicArn:               &p.topicARN,
-		MessageAttributes:      prepared.MessageAttributes,
-		MessageDeduplicationId: aws.String(message.MessageId),
+		Message:           prepared.Message,
+		TopicArn:          &p.topicARN,
+		MessageAttributes: prepared.MessageAttributes,
 	}
 	_, err := p.client.Publish(ctx, input)
 	return err
@@ -135,9 +139,22 @@ func (p *SNSPublisher) PublishBatch(ctx context.Context, msgs []*messaging_pb.Me
 
 		for _, entry := range out.Successful {
 			successIDs = append(successIDs, *entry.Id)
+			log.WithFields(ctx, map[string]interface{}{
+				"topic_arn":  p.topicARN,
+				"message_id": *entry.Id,
+			}).Info("Published to SNS")
 		}
 
 		if len(out.Failed) > 0 {
+			for _, entry := range out.Failed {
+				log.WithFields(ctx, map[string]interface{}{
+					"topic_arn":     p.topicARN,
+					"message_id":    entry.Id,
+					"error_code":    *entry.Code,
+					"error_message": *entry.Message,
+				}).Error("Failed to PublishBatch event to SNS")
+			}
+
 			// err earlier likely already is not nil, but just in case.
 			return successIDs, fmt.Errorf("failed to send batch")
 		}
