@@ -7,6 +7,7 @@ import (
 )
 
 type Publisher interface {
+	PublisherID() string
 	Publish(ctx context.Context, msg *messaging_pb.Message) error
 	PublishBatch(ctx context.Context, msgs []*messaging_pb.Message) ([]string, error)
 }

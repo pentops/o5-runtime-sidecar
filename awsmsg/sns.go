@@ -140,18 +140,18 @@ func (p *SNSPublisher) PublishBatch(ctx context.Context, msgs []*messaging_pb.Me
 		for _, entry := range out.Successful {
 			successIDs = append(successIDs, *entry.Id)
 			log.WithFields(ctx, map[string]interface{}{
-				"topic_arn":  p.topicARN,
-				"message_id": *entry.Id,
+				"topicArn":  p.topicARN,
+				"messageId": *entry.Id,
 			}).Info("Published to SNS")
 		}
 
 		if len(out.Failed) > 0 {
 			for _, entry := range out.Failed {
 				log.WithFields(ctx, map[string]interface{}{
-					"topic_arn":     p.topicARN,
-					"message_id":    entry.Id,
-					"error_code":    *entry.Code,
-					"error_message": *entry.Message,
+					"topicArn":     p.topicARN,
+					"messageId":    entry.Id,
+					"errorCode":    *entry.Code,
+					"errorMessage": *entry.Message,
 				}).Error("Failed to PublishBatch event to SNS")
 			}
 
