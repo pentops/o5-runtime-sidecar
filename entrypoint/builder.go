@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	jsonapi_codec "github.com/pentops/jsonapi/codec"
-	"github.com/pentops/jsonapi/gen/j5/source/v1/source_j5pb"
+	"github.com/pentops/jsonapi/gen/j5/config/v1/config_j5pb"
 	"github.com/pentops/jsonapi/proxy"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
@@ -111,8 +111,8 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	}
 
 	if envConfig.PublicAddr != "" {
-		codecOptions := &source_j5pb.CodecOptions{
-			ShortEnums: &source_j5pb.ShortEnumOptions{
+		codecOptions := &config_j5pb.CodecOptions{
+			ShortEnums: &config_j5pb.ShortEnumOptions{
 				UnspecifiedSuffix: "UNSPECIFIED",
 				StrictUnmarshal:   true,
 			},

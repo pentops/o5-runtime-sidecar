@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	sq "github.com/elgris/sqrl"
@@ -136,10 +137,28 @@ func parseOutboxMessage(row outboxRow, source awsmsg.SourceConfig) (*messaging_p
 	}
 	delete(simpleHeaders, "grpc-service")
 
+	var protoMethodName string
+
+	if strings.HasPrefix(protoServiceName, "/") {
+		parts := strings.Split(protoServiceName, "/")
+		if len(parts) != 3 {
+			return nil, fmt.Errorf("invalid service name: %s", protoServiceName)
+		}
+		protoServiceName = parts[1]
+		protoMethodName = parts[2]
+	} else {
+		protoMethodName, ok = simpleHeaders["grpc-method"]
+		if !ok || protoMethodName == "" {
+			return nil, fmt.Errorf("grpc-method header missing from outbox message and grpc-service isn't a full descriptor")
+		}
+
+	}
+
 	msg := &messaging_pb.Message{
 		MessageId:        row.id,
 		DestinationTopic: row.destination,
-		GrpcMethod:       protoServiceName,
+		GrpcMethod:       protoMethodName,
+		GrpcService:      protoServiceName,
 		SourceApp:        source.SourceApp,
 		SourceEnv:        source.SourceEnv,
 		Headers:          simpleHeaders,
