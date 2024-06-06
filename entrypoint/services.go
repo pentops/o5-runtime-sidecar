@@ -6,7 +6,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/pentops/jsonapi/proxy"
+	"github.com/pentops/j5/proxy"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/auth/v1/auth_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"

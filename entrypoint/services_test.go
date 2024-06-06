@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/pentops/flowtest/prototest"
-	"github.com/pentops/jsonapi/proxy"
+	"github.com/pentops/j5/proxy"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

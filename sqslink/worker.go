@@ -10,16 +10,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
-	"github.com/pentops/dante/gen/o5/dante/v1/dante_pb"
-	"github.com/pentops/dante/gen/o5/dante/v1/dante_tpb"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/known/anypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const RawMessageName = "/o5.messaging.v1.topic.RawMessageTopic/Raw"
@@ -206,7 +202,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 			log.WithError(ctx, err).Error("failed to parse message, leaving in queue")
 			return
 		}
-		err := ww.killMessage(ctx, parsed, msg, err)
+		err := ww.killMessage(ctx, parsed, err)
 		if err != nil {
 			log.WithField(ctx, "killError", err.Error()).Error("Error killing unparsable message, leaving in queue")
 			return
@@ -240,7 +236,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 			log.Error(ctx, "Error handling message, leaving in queue")
 			return
 		}
-		err := ww.killMessage(ctx, parsed, msg, err)
+		err := ww.killMessage(ctx, parsed, err)
 		if err != nil {
 			log.WithField(ctx, "killError", err.Error()).Error("Error killing message, leaving in queue")
 			return
@@ -261,31 +257,18 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	}
 }
 
-func (ww *Worker) killMessage(ctx context.Context, msg *messaging_pb.Message, sqsMsg types.Message, killError error) error {
+func (ww *Worker) killMessage(ctx context.Context, msg *messaging_pb.Message, killError error) error {
 	if ww.deadLetterHandler == nil {
 		return fmt.Errorf("no dead letter handler")
 	}
 
-	deadMessage := &dante_tpb.DeadMessage{
-		InfraMessageId: *sqsMsg.MessageId,
-		MessageId:      msg.MessageId,
-		QueueName:      ww.QueueURL,
-		GrpcName:       fmt.Sprintf("/%s/%s", msg.GrpcService, msg.GrpcMethod),
-		Timestamp:      timestamppb.Now(),
-		Problem: &dante_pb.Problem{
-			Type: &dante_pb.Problem_UnhandledError{
-				UnhandledError: &dante_pb.UnhandledError{
-					Error: killError.Error(),
-				},
-			},
-		},
-		Payload: &dante_pb.Any{
-			Proto: &anypb.Any{
-				TypeUrl: msg.Body.TypeUrl,
-				Value:   msg.Body.Value,
+	problem := &messaging_tpb.Problem{
+		Type: &messaging_tpb.Problem_UnhandledError_{
+			UnhandledError: &messaging_tpb.Problem_UnhandledError{
+				Error: killError.Error(),
 			},
 		},
 	}
 
-	return ww.deadLetterHandler.DeadMessage(ctx, deadMessage)
+	return ww.deadLetterHandler.DeadMessage(ctx, msg, problem)
 }

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	jsonapi_codec "github.com/pentops/jsonapi/codec"
-	"github.com/pentops/jsonapi/gen/j5/config/v1/config_j5pb"
-	"github.com/pentops/jsonapi/proxy"
+	jsonapi_codec "github.com/pentops/j5/codec"
+	"github.com/pentops/j5/gen/j5/config/v1/config_j5pb"
+	"github.com/pentops/j5/proxy"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"

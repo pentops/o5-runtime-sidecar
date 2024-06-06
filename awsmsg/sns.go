@@ -71,13 +71,20 @@ func prepareSNSMessage(msg *messaging_pb.Message) types.PublishBatchRequestEntry
 		DataType:    aws.String("String"),
 	}
 
-	if msg.ReplyDest != nil {
+	switch ext := msg.Extension.(type) {
+	case *messaging_pb.Message_Reply_:
 		attributes["o5-reply-reply-to"] = types.MessageAttributeValue{
-			StringValue: aws.String(*msg.ReplyDest),
+			StringValue: aws.String(ext.Reply.ReplyTo),
 			DataType:    aws.String("String"),
 		}
-	}
 
+	case *messaging_pb.Message_Request_:
+		attributes["o5-reply-to"] = types.MessageAttributeValue{
+			StringValue: aws.String(ext.Request.ReplyTo),
+			DataType:    aws.String("String"),
+		}
+
+	}
 	body := base64.StdEncoding.EncodeToString(msg.Body.Value)
 
 	return types.PublishBatchRequestEntry{

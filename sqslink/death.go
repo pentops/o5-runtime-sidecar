@@ -4,14 +4,15 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/pentops/dante/gen/o5/dante/v1/dante_tpb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
+	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
-	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type DeadLetterHandler interface {
-	DeadMessage(context.Context, *dante_tpb.DeadMessage) error
+	DeadMessage(context.Context, *messaging_pb.Message, *messaging_tpb.Problem) error
 }
 
 type O5MessageDeadLetterHandler struct {
@@ -26,24 +27,32 @@ func NewO5MessageDeadLetterHandler(publisher awsmsg.Publisher, source awsmsg.Sou
 	}
 }
 
-func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, deadMessage *dante_tpb.DeadMessage) error {
+func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, deadMessage *messaging_pb.Message, problem *messaging_tpb.Problem) error {
 
-	protoBody, err := proto.Marshal(deadMessage)
+	death := &messaging_tpb.DeadMessage{
+		DeathId:    uuid.New().String(),
+		HandlerApp: deadMessage.SourceApp,
+		HandlerEnv: deadMessage.SourceEnv,
+		Problem:    problem,
+		Message:    deadMessage,
+	}
+
+	protoBody, err := protojson.Marshal(death)
 	if err != nil {
 		return err
 	}
 
 	wireMsg := &messaging_pb.Message{
-		MessageId:   uuid.New().String(), // Using new here, as this is a unique instance of a death.
+		MessageId:   death.DeathId,
 		GrpcService: "o5.deployer.v1.topic.DeadLetterTopic",
 		GrpcMethod:  "DeadLetter",
 		Body: &messaging_pb.Any{
 			TypeUrl: "type.googleapis.com/o5.deployer.v1.topic.DeadMessage",
 			Value:   protoBody,
 		},
-		DestinationTopic: deadMessage.MessagingTopic(),
-		SourceApp:        dlh.source.SourceApp,
-		SourceEnv:        dlh.source.SourceEnv,
+		SourceApp: dlh.source.SourceApp,
+		SourceEnv: dlh.source.SourceEnv,
+		Timestamp: timestamppb.Now(),
 	}
 
 	if err := dlh.publisher.Publish(ctx, wireMsg); err != nil {
