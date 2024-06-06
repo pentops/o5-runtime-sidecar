@@ -164,14 +164,8 @@ func (ww *Worker) FetchOnce(ctx context.Context) error {
 		return err
 	}
 
-	if len(out.Messages) == 0 {
-		log.Info(ctx, "no messages")
-	}
-
 	for _, msg := range out.Messages {
-
 		ww.handleMessage(ctx, msg)
-
 		if randomlySelected(ctx, ww.resendChance) {
 			ww.handleMessage(ctx, msg)
 		}
@@ -215,6 +209,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	ctx = log.WithFields(ctx, map[string]interface{}{
 		"grpc-service":   parsed.GrpcService,
 		"grpc-method":    parsed.GrpcMethod,
+		"message-id":     parsed.MessageId,
 		"sqs-message-id": msg.MessageId,
 	})
 
@@ -225,25 +220,26 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		return
 	}
 
-	log.Debug(ctx, "begin handle message")
+	log.Debug(ctx, "Message Handler: Begin")
 
 	err = handler.HandleMessage(ctx, parsed.Body)
 
 	if err != nil {
 		ctx = log.WithError(ctx, err)
-		log.Error(ctx, "Error handling message")
+		log.Error(ctx, "Message Handler: Error")
 		if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
 			log.Error(ctx, "Error handling message, leaving in queue")
 			return
 		}
 		err := ww.killMessage(ctx, parsed, err)
 		if err != nil {
-			log.WithField(ctx, "killError", err.Error()).Error("Error killing message, leaving in queue")
+			log.WithField(ctx, "killError", err.Error()).
+				Error("Error killing message, leaving in queue")
 			return
 		}
-		log.Info(ctx, "Killed")
+		log.Debug(ctx, "Message Handler: Killed")
 	} else {
-		log.Info(ctx, "Success")
+		log.Info(ctx, "Message Handler: Success")
 	}
 
 	// Delete
