@@ -12,8 +12,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/pentops/flowtest v0.0.0-20240525161451-19748de5798c
-	github.com/pentops/j5 v0.0.0-20240606020237-4d2cd28379b5
-	github.com/pentops/jwtauth v0.0.0-20240523172427-effd1f0a6fb5
+	github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d
+	github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a
 	github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db
 	github.com/pentops/o5-go v0.0.0-20240606005545-2155cf071c16
 	github.com/pentops/runner v0.0.0-20240525192419-d655233635e9

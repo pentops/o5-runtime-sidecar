@@ -99,10 +99,10 @@ github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
 github.com/pentops/flowtest v0.0.0-20240525161451-19748de5798c h1:XJ1gQK653XP+VxEhDcrcFitGzlPzOhdSRr+qoAFojSE=
 github.com/pentops/flowtest v0.0.0-20240525161451-19748de5798c/go.mod h1:6Pf0nvVOm8SX9Lw0Su1k7IlC+1OMXDUztRj82+f+GjU=
-github.com/pentops/j5 v0.0.0-20240606020237-4d2cd28379b5 h1:HHyDBb3qo0zcN3Qk9ntk8srDQL2VMCkDtwo0/48mOv8=
-github.com/pentops/j5 v0.0.0-20240606020237-4d2cd28379b5/go.mod h1:qLGLYTzorakB+TN24gHF7Ho73tJ3C/PLVXJG5BRT32Y=
-github.com/pentops/jwtauth v0.0.0-20240523172427-effd1f0a6fb5 h1:MfhNRWeVS3Xt9P0vJDMt6fS0BKLlajIub6VRXI3BYMk=
-github.com/pentops/jwtauth v0.0.0-20240523172427-effd1f0a6fb5/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
+github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d h1:BUlp01oXkGpNXFu6tpu4Sw2jYnFhNii+dRRwEexuy/8=
+github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d/go.mod h1:qLGLYTzorakB+TN24gHF7Ho73tJ3C/PLVXJG5BRT32Y=
+github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a h1:7nGqA5BwbOwLzDQCNHSUdonuoFJaVxYVed9418jAokE=
+github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
 github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db h1:+d9Omr3fQ/A7f318vAReTDjPfH4t9XbcnCF8w6TD3Hs=
 github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
 github.com/pentops/o5-go v0.0.0-20240606005545-2155cf071c16 h1:Lve9dZK1uYbMz3umI0Mo+I/Fjn/RmpO4u1ULSzhj1B0=
