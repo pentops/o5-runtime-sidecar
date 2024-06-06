@@ -31,8 +31,8 @@ func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, deadMess
 
 	death := &messaging_tpb.DeadMessage{
 		DeathId:    uuid.New().String(),
-		HandlerApp: deadMessage.SourceApp,
-		HandlerEnv: deadMessage.SourceEnv,
+		HandlerApp: dlh.source.SourceApp,
+		HandlerEnv: dlh.source.SourceEnv,
 		Problem:    problem,
 		Message:    deadMessage,
 	}
