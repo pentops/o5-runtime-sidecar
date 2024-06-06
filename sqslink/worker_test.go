@@ -38,9 +38,11 @@ func TestDynamicParse(t *testing.T) {
 		Id:   "asdf",
 	}
 
-	asProto, err := handler.parseMessageBody(&messaging_pb.Any{
-		Encoding: messaging_pb.WireEncoding_PROTOJSON,
-		Value:    []byte(`{"name": "test", "id": "asdf"}`),
+	asProto, err := handler.parseMessageBody(&messaging_pb.Message{
+		Body: &messaging_pb.Any{
+			Encoding: messaging_pb.WireEncoding_PROTOJSON,
+			Value:    []byte(`{"name": "test", "id": "asdf"}`),
+		},
 	})
 	if err != nil {
 		t.Fatal(err.Error())

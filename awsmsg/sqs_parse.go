@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/google/uuid"
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -26,6 +28,7 @@ type SNSMessageWrapper struct {
 	Message   string `json:"Message"`
 	MessageID string `json:"MessageId"`
 	TopicArn  string `json:"TopicArn"`
+	Timestamp string `json:"Timestamp"`
 }
 
 type EventBridgeWrapper struct {
@@ -54,6 +57,8 @@ func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
 	}
 
 	// Try to parse various wrapper methods
+
+	// EventBridge
 	wrapper := &EventBridgeWrapper{}
 	if err := json.Unmarshal([]byte(*msg.Body), wrapper); err == nil && wrapper.DetailType != "" {
 		switch wrapper.DetailType {
@@ -69,6 +74,36 @@ func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
 		}
 
 	}
+
+	// SNS Wrapper
+	snsWrapper := &SNSMessageWrapper{}
+	if err := json.Unmarshal([]byte(*msg.Body), snsWrapper); err == nil {
+		if snsWrapper.Type == "Notification" && strings.HasPrefix(snsWrapper.TopicArn, "arn:aws:sns:") {
+			topicParts := strings.Split(snsWrapper.TopicArn, ":")
+			if len(topicParts) != 6 {
+				return nil, fmt.Errorf("invalid SNS topic ARN: %s", snsWrapper.TopicArn)
+			}
+
+			outboxMessage := &messaging_pb.Message{
+				MessageId: *msg.MessageId,
+				Body: &messaging_pb.Any{
+					Encoding: messaging_pb.WireEncoding_RAW,
+					Value:    []byte(snsWrapper.Message),
+				},
+				GrpcService:      "o5.messaging.v1.topic.RawMessageTopic",
+				GrpcMethod:       "Raw",
+				DestinationTopic: topicParts[5],
+			}
+			if timestamp, err := time.Parse(time.RFC3339, snsWrapper.Timestamp); err == nil {
+				outboxMessage.Timestamp = timestamppb.New(timestamp)
+			} else {
+				outboxMessage.Timestamp = timestamppb.Now()
+			}
+
+			return outboxMessage, nil
+		}
+	}
+
 	return nil, fmt.Errorf("unsupported message format")
 }
 

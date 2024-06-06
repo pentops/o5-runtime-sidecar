@@ -65,6 +65,27 @@ func TestParser(t *testing.T) {
 			},
 		},
 	}, {
+		name: "sns-raw",
+		input: types.Message{
+			MessageId: aws.String("asdf"),
+			Body: aws.String(`{
+				"Message": "Hello World!",
+				"MessageId": "asdf",
+				"Type": "Notification",
+				"TopicArn": "arn:aws:sns:us-west-2:123456789012:MyTopic",
+				"Timestamp": "2012-03-29T05:12:16.901Z"
+			}`),
+		},
+		want: &messaging_pb.Message{
+			GrpcService:      "o5.messaging.v1.topic.RawMessageTopic",
+			GrpcMethod:       "Raw",
+			DestinationTopic: "MyTopic",
+			Body: &messaging_pb.Any{
+				Encoding: messaging_pb.WireEncoding_RAW,
+				Value:    []byte(`Hello World!`),
+			},
+		},
+	}, {
 		name: "o5-wrapped",
 		input: types.Message{
 			MessageAttributes: map[string]types.MessageAttributeValue{},

@@ -3,7 +3,6 @@ package sqslink
 import (
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -14,7 +13,6 @@ import (
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -26,12 +24,12 @@ type SQSAPI interface {
 }
 
 type Handler interface {
-	HandleMessage(context.Context, *messaging_pb.Any) error
+	HandleMessage(context.Context, *messaging_pb.Message) error
 }
 
-type HandlerFunc func(context.Context, *messaging_pb.Any) error
+type HandlerFunc func(context.Context, *messaging_pb.Message) error
 
-func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *messaging_pb.Any) error {
+func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *messaging_pb.Message) error {
 	return hf(ctx, msg)
 }
 
@@ -103,24 +101,6 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 
 	log.WithField(ctx, "service", ss.fullName).Info("Registering Worker Service")
 
-	if ss.fullName == RawMessageName {
-		ss.customParser = func(b []byte) (proto.Message, error) {
-			snsMessage := &awsmsg.SNSMessageWrapper{}
-			err := json.Unmarshal(b, snsMessage)
-			if err != nil {
-				log.WithError(ctx, err).Error("failed to unmarshal SNS message, falling back to raw")
-				return &messaging_tpb.RawMessage{
-					Payload: b,
-				}, nil
-			}
-
-			return &messaging_tpb.RawMessage{
-				Topic:   snsMessage.TopicArn,
-				Payload: []byte(snsMessage.Message),
-			}, nil
-		}
-	}
-
 	ww.services[ss.fullName] = ss
 
 	return nil
@@ -190,18 +170,18 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	parsed, err := awsmsg.ParseSQSMessage(msg)
 	if err != nil {
 		// Leave it for retry unless we keep failing at parsing it
-		log.WithError(ctx, err).Error("failed to parse message")
+		log.WithError(ctx, err).Error("Message Worker: Failed to parse message")
 
 		if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
-			log.WithError(ctx, err).Error("failed to parse message, leaving in queue")
+			log.WithError(ctx, err).Error("Message Worker: failed to parse message, leaving in queue")
 			return
 		}
 		err := ww.killMessage(ctx, parsed, err)
 		if err != nil {
-			log.WithField(ctx, "killError", err.Error()).Error("Error killing unparsable message, leaving in queue")
+			log.WithField(ctx, "killError", err.Error()).Error("Message Worker: Error killing unparsable message, leaving in queue")
 			return
 		}
-		log.Info(ctx, "Killed due to parsing issues")
+		log.Info(ctx, "Message Handler: Killed due to parsing issues")
 
 		return
 	}
@@ -210,6 +190,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		"grpc-service":   parsed.GrpcService,
 		"grpc-method":    parsed.GrpcMethod,
 		"message-id":     parsed.MessageId,
+		"topic":          parsed.DestinationTopic,
 		"sqs-message-id": msg.MessageId,
 	})
 
@@ -222,7 +203,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 
 	log.Debug(ctx, "Message Handler: Begin")
 
-	err = handler.HandleMessage(ctx, parsed.Body)
+	err = handler.HandleMessage(ctx, parsed)
 
 	if err != nil {
 		ctx = log.WithError(ctx, err)
@@ -234,7 +215,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		err := ww.killMessage(ctx, parsed, err)
 		if err != nil {
 			log.WithField(ctx, "killError", err.Error()).
-				Error("Error killing message, leaving in queue")
+				Error("Message Worker: Error killing message, leaving in queue")
 			return
 		}
 		log.Debug(ctx, "Message Handler: Killed")
