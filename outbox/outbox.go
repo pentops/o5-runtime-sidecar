@@ -13,6 +13,7 @@ import (
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/sqrlx.go/sqrlx"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 )
@@ -166,13 +167,27 @@ func parseOutboxMessage(row outboxRow, source awsmsg.SourceConfig) (*messaging_p
 			TypeUrl: fmt.Sprintf("type.googleapis.com/%s", protoMessageName),
 			Value:   row.message,
 		},
-		ReplyDest: nil,
+		Timestamp: timestamppb.Now(),
 	}
 
-	replyTo, ok := simpleHeaders["o5-reply-reply-to"]
+	replyReply, ok := simpleHeaders["o5-reply-reply-to"]
 	if ok {
-		msg.ReplyDest = &replyTo
-		delete(simpleHeaders, "o5-reply-reply-to")
+		msg.Extension = &messaging_pb.Message_Reply_{
+			Reply: &messaging_pb.Message_Reply{
+				ReplyTo: replyReply,
+			},
+		}
+		delete(msg.Headers, "o5-reply-reply-to")
+	}
+
+	requestReplyTo, ok := simpleHeaders["o5-reply-to"]
+	if ok {
+		msg.Extension = &messaging_pb.Message_Request_{
+			Request: &messaging_pb.Message_Request{
+				ReplyTo: requestReplyTo,
+			},
+		}
+		delete(msg.Headers, "o5-reply-to")
 	}
 
 	return msg, nil
