@@ -15,7 +15,7 @@ require (
 	github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d
 	github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a
 	github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db
-	github.com/pentops/o5-go v0.0.0-20240606005545-2155cf071c16
+	github.com/pentops/o5-go v0.0.0-20240606053645-d00c942845aa
 	github.com/pentops/runner v0.0.0-20240525192419-d655233635e9
 	github.com/pentops/sqrlx.go v0.0.0-20240523172712-b615a994d8c0
 	github.com/rs/cors v1.10.1

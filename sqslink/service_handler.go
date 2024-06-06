@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
+	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -22,26 +23,37 @@ type service struct {
 	requestMessage protoreflect.MessageDescriptor
 	invoker        Invoker
 	fullName       string
-	customParser   func([]byte) (proto.Message, error)
 }
 
-func (ss service) HandleMessage(ctx context.Context, body *messaging_pb.Any) error {
-	protoBody, err := ss.parseMessageBody(body)
+func (ss service) HandleMessage(ctx context.Context, message *messaging_pb.Message) error {
+
+	protoBody, err := ss.parseMessageBody(message)
 	if err != nil {
 		return fmt.Errorf("failed to parse message body: %w", err)
 	}
 
+	requestMetadata := metadata.MD{
+		"x-o5-message-id": []string{message.MessageId},
+	}
+	ctx = metadata.NewOutgoingContext(ctx, requestMetadata)
+
 	outputMessage := &emptypb.Empty{}
+
 	// Receive response header
 	var responseHeader metadata.MD
 	err = ss.invoker.Invoke(ctx, ss.fullName, protoBody, outputMessage, grpc.Header(&responseHeader))
 	return err
 }
 
-func (ss service) parseMessageBody(body *messaging_pb.Any) (proto.Message, error) {
-	if ss.customParser != nil {
-		return ss.customParser(body.Value)
+func (ss service) parseMessageBody(message *messaging_pb.Message) (proto.Message, error) {
+	if message.Body.Encoding == messaging_pb.WireEncoding_RAW {
+		return &messaging_tpb.RawMessage{
+			Topic:   message.DestinationTopic,
+			Payload: message.Body.Value,
+		}, nil
 	}
+
+	body := message.Body
 
 	msg := dynamicpb.NewMessage(ss.requestMessage)
 	if body.TypeUrl != "" {
