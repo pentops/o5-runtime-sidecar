@@ -3,7 +3,6 @@ package sqslink
 import (
 	"context"
 
-	"github.com/google/uuid"
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
@@ -12,7 +11,7 @@ import (
 )
 
 type DeadLetterHandler interface {
-	DeadMessage(context.Context, *messaging_pb.Message, *messaging_tpb.Problem) error
+	DeadMessage(context.Context, *messaging_tpb.DeadMessage) error
 }
 
 type O5MessageDeadLetterHandler struct {
@@ -27,15 +26,10 @@ func NewO5MessageDeadLetterHandler(publisher awsmsg.Publisher, source awsmsg.Sou
 	}
 }
 
-func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, deadMessage *messaging_pb.Message, problem *messaging_tpb.Problem) error {
+func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, death *messaging_tpb.DeadMessage) error {
 
-	death := &messaging_tpb.DeadMessage{
-		DeathId:    uuid.New().String(),
-		HandlerApp: dlh.source.SourceApp,
-		HandlerEnv: dlh.source.SourceEnv,
-		Problem:    problem,
-		Message:    deadMessage,
-	}
+	death.HandlerApp = dlh.source.SourceApp
+	death.HandlerEnv = dlh.source.SourceEnv
 
 	protoBody, err := protojson.Marshal(death)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
+	"github.com/google/uuid"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
@@ -176,7 +177,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 			log.WithError(ctx, err).Error("Message Worker: failed to parse message, leaving in queue")
 			return
 		}
-		err := ww.killMessage(ctx, parsed, err)
+		err := ww.killMessage(ctx, msg, parsed, err)
 		if err != nil {
 			log.WithField(ctx, "killError", err.Error()).Error("Message Worker: Error killing unparsable message, leaving in queue")
 			return
@@ -212,7 +213,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 			log.Error(ctx, "Error handling message, leaving in queue")
 			return
 		}
-		err := ww.killMessage(ctx, parsed, err)
+		err := ww.killMessage(ctx, msg, parsed, err)
 		if err != nil {
 			log.WithField(ctx, "killError", err.Error()).
 				Error("Message Worker: Error killing message, leaving in queue")
@@ -234,9 +235,30 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	}
 }
 
-func (ww *Worker) killMessage(ctx context.Context, msg *messaging_pb.Message, killError error) error {
+func (ww *Worker) killMessage(ctx context.Context, sqsMsg types.Message, msg *messaging_pb.Message, killError error) error {
 	if ww.deadLetterHandler == nil {
 		return fmt.Errorf("no dead letter handler")
+	}
+
+	if msg == nil {
+		// Unparsable message
+		msg = &messaging_pb.Message{
+			MessageId: *sqsMsg.MessageId,
+			Body: &messaging_pb.Any{
+				TypeUrl:  RawMessageName,
+				Encoding: messaging_pb.WireEncoding_RAW,
+				Value:    []byte(*sqsMsg.Body),
+			},
+		}
+	}
+
+	meta := map[string]string{
+		"messageId": *sqsMsg.MessageId,
+		"queueURL":  ww.QueueURL,
+	}
+
+	for k, v := range sqsMsg.MessageAttributes {
+		meta["attr:"+k] = *v.StringValue
 	}
 
 	problem := &messaging_tpb.Problem{
@@ -247,5 +269,15 @@ func (ww *Worker) killMessage(ctx context.Context, msg *messaging_pb.Message, ki
 		},
 	}
 
-	return ww.deadLetterHandler.DeadMessage(ctx, msg, problem)
+	death := &messaging_tpb.DeadMessage{
+		DeathId: uuid.New().String(),
+		Problem: problem,
+		Message: msg,
+		Infra: &messaging_tpb.Infra{
+			Type:     "SQS",
+			Metadata: meta,
+		},
+	}
+
+	return ww.deadLetterHandler.DeadMessage(ctx, death)
 }

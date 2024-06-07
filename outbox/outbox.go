@@ -170,6 +170,14 @@ func parseOutboxMessage(row outboxRow, source awsmsg.SourceConfig) (*messaging_p
 		Timestamp: timestamppb.Now(),
 	}
 
+	contentEncoding, ok := simpleHeaders["wire-encoding"]
+	if ok {
+		enc, ok := messaging_pb.WireEncoding_value_either[contentEncoding]
+		if ok {
+			msg.Body.Encoding = messaging_pb.WireEncoding(enc)
+		}
+	}
+
 	replyReply, ok := simpleHeaders["o5-reply-reply-to"]
 	if ok {
 		msg.Extension = &messaging_pb.Message_Reply_{
