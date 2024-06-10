@@ -15,12 +15,12 @@ require (
 	github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d
 	github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a
 	github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db
-	github.com/pentops/o5-go v0.0.0-20240607144529-76a7ffd8ae8b
+	github.com/pentops/o5-go v0.0.0-20240610223907-ad5d22e3975f
 	github.com/pentops/runner v0.0.0-20240525192419-d655233635e9
 	github.com/pentops/sqrlx.go v0.0.0-20240523172712-b615a994d8c0
 	github.com/rs/cors v1.10.1
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20240604185151-ef581f913117
+	google.golang.org/genproto/googleapis/api v0.0.0-20240610135401-a8a62080eff3
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.2-0.20240529085009-ca837e5c658b
 	gopkg.daemonl.com/envconf v0.0.0-20220909014755-d65ec77bd452
@@ -47,8 +47,7 @@ require (
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/jhump/protoreflect v1.16.0 // indirect
-	github.com/kr/text v0.2.0 // indirect
-	github.com/pentops/protostate v0.0.0-20240606062858-6ae7d31667ac // indirect
+	github.com/pentops/o5-messaging.go v0.0.0-20240610214326-d2aa0570d347 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
@@ -57,7 +56,6 @@ require (
 	golang.org/x/sync v0.7.0 // indirect
 	golang.org/x/sys v0.21.0 // indirect
 	golang.org/x/text v0.16.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240604185151-ef581f913117 // indirect
-	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240610135401-a8a62080eff3 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

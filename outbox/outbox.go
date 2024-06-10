@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net/url"
-	"strings"
 	"time"
 
 	sq "github.com/elgris/sqrl"
@@ -13,7 +11,7 @@ import (
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/sqrlx.go/sqrlx"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 )
@@ -116,87 +114,14 @@ func (ll *Listener) rowsCallback(ctx context.Context, rows []outboxRow) ([]strin
 }
 
 func parseOutboxMessage(row outboxRow, source awsmsg.SourceConfig) (*messaging_pb.Message, error) {
-
-	headers, err := url.ParseQuery(row.header)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing headers from outbox message: %w", err)
-	}
-	simpleHeaders := map[string]string{}
-	for k, v := range headers {
-		simpleHeaders[k] = v[0]
+	msg := &messaging_pb.Message{}
+	if err := protojson.Unmarshal(row.message, msg); err != nil {
+		return nil, fmt.Errorf("error unmarshalling outbox message: %w", err)
 	}
 
-	protoMessageName, ok := simpleHeaders["grpc-message"]
-	if !ok || protoMessageName == "" {
-		return nil, fmt.Errorf("grpc-message header missing from outbox message")
-	}
-	delete(simpleHeaders, "grpc-message")
-
-	protoServiceName, ok := simpleHeaders["grpc-service"]
-	if !ok || protoServiceName == "" {
-		return nil, fmt.Errorf("grpc-service header missing from outbox message")
-	}
-	delete(simpleHeaders, "grpc-service")
-
-	var protoMethodName string
-
-	if strings.HasPrefix(protoServiceName, "/") {
-		parts := strings.Split(protoServiceName, "/")
-		if len(parts) != 3 {
-			return nil, fmt.Errorf("invalid service name: %s", protoServiceName)
-		}
-		protoServiceName = parts[1]
-		protoMethodName = parts[2]
-	} else {
-		protoMethodName, ok = simpleHeaders["grpc-method"]
-		if !ok || protoMethodName == "" {
-			return nil, fmt.Errorf("grpc-method header missing from outbox message and grpc-service isn't a full descriptor")
-		}
-
-	}
-
-	msg := &messaging_pb.Message{
-		MessageId:        row.id,
-		DestinationTopic: row.destination,
-		GrpcMethod:       protoMethodName,
-		GrpcService:      protoServiceName,
-		SourceApp:        source.SourceApp,
-		SourceEnv:        source.SourceEnv,
-		Headers:          simpleHeaders,
-		Body: &messaging_pb.Any{
-			TypeUrl: fmt.Sprintf("type.googleapis.com/%s", protoMessageName),
-			Value:   row.message,
-		},
-		Timestamp: timestamppb.Now(),
-	}
-
-	contentEncoding, ok := simpleHeaders["wire-encoding"]
-	if ok {
-		enc, ok := messaging_pb.WireEncoding_value_either[contentEncoding]
-		if ok {
-			msg.Body.Encoding = messaging_pb.WireEncoding(enc)
-		}
-	}
-
-	replyReply, ok := simpleHeaders["o5-reply-reply-to"]
-	if ok {
-		msg.Extension = &messaging_pb.Message_Reply_{
-			Reply: &messaging_pb.Message_Reply{
-				ReplyTo: replyReply,
-			},
-		}
-		delete(msg.Headers, "o5-reply-reply-to")
-	}
-
-	requestReplyTo, ok := simpleHeaders["o5-reply-to"]
-	if ok {
-		msg.Extension = &messaging_pb.Message_Request_{
-			Request: &messaging_pb.Message_Request{
-				ReplyTo: requestReplyTo,
-			},
-		}
-		delete(msg.Headers, "o5-reply-to")
-	}
+	msg.MessageId = row.id
+	msg.SourceApp = source.SourceApp
+	msg.SourceEnv = source.SourceEnv
 
 	return msg, nil
 }
@@ -221,18 +146,14 @@ func (ll looper) loopUntilEmpty(ctx context.Context, callback pageCallback) erro
 }
 
 type outboxRow struct {
-	id          string
-	destination string
-	message     []byte
-	header      string
+	id      string
+	message []byte
 }
 
 func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error) {
 	qq := sq.Select(
 		"id",
-		"destination",
-		"message",
-		"headers",
+		"data",
 	).From("outbox").
 		OrderBy("destination ASC").
 		Limit(100).
@@ -262,9 +183,7 @@ func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error)
 
 			if err := rows.Scan(
 				&row.id,
-				&row.destination,
 				&row.message,
-				&row.header,
 			); err != nil {
 				return fmt.Errorf("error scanning outbox row: %w", err)
 			}
