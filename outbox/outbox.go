@@ -155,7 +155,6 @@ func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error)
 		"id",
 		"data",
 	).From("outbox").
-		OrderBy("destination ASC").
 		Limit(100).
 		Suffix("FOR UPDATE SKIP LOCKED")
 
