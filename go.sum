@@ -93,8 +93,8 @@ github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726 h1:91kehOTa299S
 github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726/go.mod h1:NYtaIY8a+Y8LYV9Y/nJb24zxx8mQyRK4h9k2oZDJveI=
 github.com/pentops/flowtest v0.0.0-20240607020132-7dda31076e79 h1:KDFU89YeGtsFewe5hP45bCGvt779YEUre6a6X3RmniY=
 github.com/pentops/flowtest v0.0.0-20240607020132-7dda31076e79/go.mod h1:5vX1QXxvMqOZb/KiJd4V2STThM6Q9OnHZIxAbv1Pprw=
-github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d h1:BUlp01oXkGpNXFu6tpu4Sw2jYnFhNii+dRRwEexuy/8=
-github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d/go.mod h1:qLGLYTzorakB+TN24gHF7Ho73tJ3C/PLVXJG5BRT32Y=
+github.com/pentops/j5 v0.0.0-20240611220935-212e7c4e61f2 h1:XXDlG6eGPsMUbrwkTHIQJtXp0RVltSnobUg88cPmi34=
+github.com/pentops/j5 v0.0.0-20240611220935-212e7c4e61f2/go.mod h1:hQbbJnzR5KOqDPBNSCjVWAvGiaed2TSylcGMRUbIWMs=
 github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a h1:7nGqA5BwbOwLzDQCNHSUdonuoFJaVxYVed9418jAokE=
 github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
 github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db h1:+d9Omr3fQ/A7f318vAReTDjPfH4t9XbcnCF8w6TD3Hs=
@@ -103,8 +103,6 @@ github.com/pentops/o5-go v0.0.0-20240611214452-99a6f6789ff8 h1:Fvr3HDIo5rTPghgl/
 github.com/pentops/o5-go v0.0.0-20240611214452-99a6f6789ff8/go.mod h1:+MyY/uSO1OQqBEByHYlzMIlbJSrlZSIS7ZR98VPqMIo=
 github.com/pentops/o5-messaging v0.0.0-20240611214218-4ac153f68bc9 h1:aYz0QrA4hJhbXjra1U+acvmTVt7zjYjvdjTfZKSnIBY=
 github.com/pentops/o5-messaging v0.0.0-20240611214218-4ac153f68bc9/go.mod h1:aXyY7kDScVPxRzxkxpC0jmYPWiInLkTQDwzmE9NcFOM=
-github.com/pentops/protostate v0.0.0-20240610211526-361e6c3ed773 h1:5wU7B+u8rVDt8u/VLQQ4EODMw7NXjwYUfdduWi0emA8=
-github.com/pentops/protostate v0.0.0-20240610211526-361e6c3ed773/go.mod h1:UnHwsdantal/slNf4vywJvl8a3TtaYc8Oi54yikcM2E=
 github.com/pentops/runner v0.0.0-20240525192419-d655233635e9 h1:wQ4+oVfsgXH8Rlh7p3qs44JmZ+SgFCRNtY+aDuNH5OQ=
 github.com/pentops/runner v0.0.0-20240525192419-d655233635e9/go.mod h1:h7jrFRlRvcomei3LdBp1YaJB3nk9s2Vj0fW2ftDYCbY=
 github.com/pentops/sqrlx.go v0.0.0-20240523172712-b615a994d8c0 h1:0OTQyz+jyxOdDxlFBM24zq5Q3VSI8fYHxcHUSXkuS3I=
