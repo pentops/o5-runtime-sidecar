@@ -123,6 +123,9 @@ func parseOutboxMessage(row outboxRow, source awsmsg.SourceConfig) (*messaging_p
 	msg.SourceApp = source.SourceApp
 	msg.SourceEnv = source.SourceEnv
 
+	if msg.Headers == nil {
+		msg.Headers = map[string]string{}
+	}
 	msg.Headers["o5-sidecar-outbox-version"] = source.SidecarVersion
 
 	return msg, nil
