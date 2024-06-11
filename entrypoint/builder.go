@@ -38,6 +38,9 @@ type Config struct {
 	ResendChance int `env:"RESEND_CHANCE" required:"false"`
 
 	NoDeadLetters bool `env:"NO_DEADLETTERS" default:"false"`
+
+	// set from main
+	SidecarVersion string
 }
 
 func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
@@ -45,8 +48,9 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	rt.endpoints = envConfig.ServiceEndpoints
 
 	srcConfig := awsmsg.SourceConfig{
-		SourceApp: envConfig.AppName,
-		SourceEnv: envConfig.EnvironmentName,
+		SourceApp:      envConfig.AppName,
+		SourceEnv:      envConfig.EnvironmentName,
+		SidecarVersion: envConfig.SidecarVersion,
 	}
 
 	if envConfig.EventBridgeARN != "" {

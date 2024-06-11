@@ -8,7 +8,7 @@ ARG VERSION
 RUN \
 	--mount=type=cache,target=/go/pkg/mod \
 	--mount=type=cache,target=/root/.cache/go-build \
-CGO_ENABLED=0 go build -ldflags="-X main.Version=$VERSION" -v -o /server ./cmd/main/
+CGO_ENABLED=0 go build -ldflags="-X main.version=$VERSION" -v -o /server ./cmd/main/
 
 FROM scratch
 

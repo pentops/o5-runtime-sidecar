@@ -13,6 +13,7 @@ type Publisher interface {
 }
 
 type SourceConfig struct {
-	SourceApp string
-	SourceEnv string
+	SourceApp      string
+	SourceEnv      string
+	SidecarVersion string
 }

@@ -11,7 +11,7 @@ import (
 	"github.com/pentops/log.go/log"
 )
 
-var Version string
+var Version string = "dev"
 
 func main() {
 	ctx := context.Background()
@@ -26,6 +26,8 @@ func main() {
 		log.WithError(ctx, err).Error("Config Failure")
 		os.Exit(1)
 	}
+
+	cfg.SidecarVersion = Version
 
 	if err := run(ctx, cfg); err != nil {
 		log.WithError(ctx, err).Error("Failed to serve")

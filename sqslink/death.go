@@ -47,6 +47,9 @@ func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, death *m
 		SourceApp: dlh.source.SourceApp,
 		SourceEnv: dlh.source.SourceEnv,
 		Timestamp: timestamppb.Now(),
+		Headers: map[string]string{
+			"o5-sidecar-worker-version": dlh.source.SidecarVersion,
+		},
 	}
 
 	if err := dlh.publisher.Publish(ctx, wireMsg); err != nil {
