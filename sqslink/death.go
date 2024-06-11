@@ -2,6 +2,7 @@ package sqslink
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
@@ -36,20 +37,27 @@ func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, death *m
 		return err
 	}
 
+	header := death.O5MessageHeader()
+	headers := header.Headers
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	headers["o5-sidecar-worker-version"] = dlh.source.SidecarVersion
+
 	wireMsg := &messaging_pb.Message{
-		MessageId:   death.DeathId,
-		GrpcService: "o5.deployer.v1.topic.DeadLetterTopic",
-		GrpcMethod:  "DeadLetter",
+		DestinationTopic: header.DestinationTopic,
+		Extension:        header.Extension,
+		MessageId:        death.DeathId,
+		GrpcService:      header.GrpcService,
+		GrpcMethod:       header.GrpcMethod,
 		Body: &messaging_pb.Any{
-			TypeUrl: "type.googleapis.com/o5.deployer.v1.topic.DeadMessage",
+			TypeUrl: fmt.Sprintf("type.googleapis.com/%s", death.ProtoReflect().Descriptor().FullName()),
 			Value:   protoBody,
 		},
 		SourceApp: dlh.source.SourceApp,
 		SourceEnv: dlh.source.SourceEnv,
 		Timestamp: timestamppb.Now(),
-		Headers: map[string]string{
-			"o5-sidecar-worker-version": dlh.source.SidecarVersion,
-		},
+		Headers:   headers,
 	}
 
 	if err := dlh.publisher.Publish(ctx, wireMsg); err != nil {
