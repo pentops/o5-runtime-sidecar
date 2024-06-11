@@ -2,12 +2,10 @@ package sqslink
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
+	"github.com/pentops/o5-messaging/o5msg"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -32,35 +30,17 @@ func (dlh *O5MessageDeadLetterHandler) DeadMessage(ctx context.Context, death *m
 	death.HandlerApp = dlh.source.SourceApp
 	death.HandlerEnv = dlh.source.SourceEnv
 
-	protoBody, err := protojson.Marshal(death)
+	wrapper, err := o5msg.WrapMessage(death)
 	if err != nil {
 		return err
 	}
 
-	header := death.O5MessageHeader()
-	headers := header.Headers
-	if headers == nil {
-		headers = make(map[string]string)
-	}
-	headers["o5-sidecar-worker-version"] = dlh.source.SidecarVersion
+	wrapper.Headers["o5-sidecar-worker-version"] = dlh.source.SidecarVersion
+	wrapper.SourceApp = dlh.source.SourceApp
+	wrapper.SourceEnv = dlh.source.SourceEnv
+	wrapper.Timestamp = timestamppb.Now()
 
-	wireMsg := &messaging_pb.Message{
-		DestinationTopic: header.DestinationTopic,
-		Extension:        header.Extension,
-		MessageId:        death.DeathId,
-		GrpcService:      header.GrpcService,
-		GrpcMethod:       header.GrpcMethod,
-		Body: &messaging_pb.Any{
-			TypeUrl: fmt.Sprintf("type.googleapis.com/%s", death.ProtoReflect().Descriptor().FullName()),
-			Value:   protoBody,
-		},
-		SourceApp: dlh.source.SourceApp,
-		SourceEnv: dlh.source.SourceEnv,
-		Timestamp: timestamppb.Now(),
-		Headers:   headers,
-	}
-
-	if err := dlh.publisher.Publish(ctx, wireMsg); err != nil {
+	if err := dlh.publisher.Publish(ctx, wrapper); err != nil {
 		return err
 	}
 
