@@ -11,8 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/google/uuid"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
-	"github.com/pentops/o5-go/messaging/v1/messaging_tpb"
+	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
+	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )

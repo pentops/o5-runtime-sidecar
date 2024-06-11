@@ -11,11 +11,13 @@ require (
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
+	github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726
 	github.com/pentops/flowtest v0.0.0-20240607020132-7dda31076e79
 	github.com/pentops/j5 v0.0.0-20240606040938-7f6c198fdc0d
 	github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a
 	github.com/pentops/log.go v0.0.0-20240523172444-85c9292a83db
-	github.com/pentops/o5-go v0.0.0-20240610223907-ad5d22e3975f
+	github.com/pentops/o5-go v0.0.0-20240611214452-99a6f6789ff8
+	github.com/pentops/o5-messaging v0.0.0-20240611214218-4ac153f68bc9
 	github.com/pentops/runner v0.0.0-20240525192419-d655233635e9
 	github.com/pentops/sqrlx.go v0.0.0-20240523172712-b615a994d8c0
 	github.com/rs/cors v1.10.1
@@ -23,7 +25,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240610135401-a8a62080eff3
 	google.golang.org/grpc v1.64.0
 	google.golang.org/protobuf v1.34.2-0.20240529085009-ca837e5c658b
-	gopkg.daemonl.com/envconf v0.0.0-20220909014755-d65ec77bd452
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
@@ -47,7 +48,6 @@ require (
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/jhump/protoreflect v1.16.0 // indirect
-	github.com/pentops/o5-messaging.go v0.0.0-20240610214326-d2aa0570d347 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	golang.org/x/crypto v0.24.0 // indirect

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
+	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
