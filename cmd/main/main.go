@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/pentops/envconf.go/envconf"
 	"github.com/pentops/o5-runtime-sidecar/entrypoint"
-	"gopkg.daemonl.com/envconf"
 
 	"github.com/pentops/log.go/log"
 )

@@ -8,7 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-go/messaging/v1/messaging_pb"
+	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
