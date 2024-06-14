@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	jsonapi_codec "github.com/pentops/j5/codec"
-	"github.com/pentops/j5/gen/j5/config/v1/config_j5pb"
 	"github.com/pentops/j5/proxy"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
@@ -115,15 +114,8 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	}
 
 	if envConfig.PublicAddr != "" {
-		codecOptions := &config_j5pb.CodecOptions{
-			ShortEnums: &config_j5pb.ShortEnumOptions{
-				UnspecifiedSuffix: "UNSPECIFIED",
-				StrictUnmarshal:   true,
-			},
-			WrapOneof: true,
-		}
 
-		router := proxy.NewRouter(jsonapi_codec.NewCodec(codecOptions))
+		router := proxy.NewRouter(jsonapi_codec.NewCodec())
 
 		router.HealthCheck("/healthz", func() error {
 			return nil

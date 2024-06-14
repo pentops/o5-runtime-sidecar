@@ -8,7 +8,7 @@ import (
 
 	"github.com/pentops/j5/proxy"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-go/auth/v1/auth_pb"
+	"github.com/pentops/o5-auth/gen/o5/auth/v1/auth_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/adapter"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
