@@ -254,7 +254,7 @@ func (ww *Worker) killMessage(ctx context.Context, sqsMsg types.Message, msg *me
 
 	meta := map[string]string{
 		"messageId": *sqsMsg.MessageId,
-		"queueURL":  ww.QueueURL,
+		"queueUrl":  ww.QueueURL,
 	}
 
 	for k, v := range sqsMsg.MessageAttributes {
