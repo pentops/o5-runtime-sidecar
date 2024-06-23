@@ -12,14 +12,14 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726
-	github.com/pentops/flowtest v0.0.0-20240607020132-7dda31076e79
-	github.com/pentops/j5 v0.0.0-20240614161723-64c6aebaabe0
+	github.com/pentops/flowtest v0.0.0-20240623020118-02bf89f30b87
+	github.com/pentops/j5 v0.0.0-20240623181903-3517059dd99a
 	github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a
-	github.com/pentops/log.go v0.0.0-20240612184720-79634792a21e
+	github.com/pentops/log.go v0.0.0-20240618224413-ed85018bafd9
 	github.com/pentops/o5-auth v0.0.0-20240614180342-3765ffa80762
 	github.com/pentops/o5-messaging v0.0.0-20240614163039-d8f7b29ba565
 	github.com/pentops/runner v0.0.0-20240525192419-d655233635e9
-	github.com/pentops/sqrlx.go v0.0.0-20240523172712-b615a994d8c0
+	github.com/pentops/sqrlx.go v0.0.0-20240618224315-b9b023d5f689
 	github.com/rs/cors v1.10.1
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240610135401-a8a62080eff3
@@ -48,11 +48,13 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
+	github.com/iancoleman/strcase v0.2.0 // indirect
 	github.com/jhump/protoreflect v1.16.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
+	github.com/shopspring/decimal v1.4.0 // indirect
 	golang.org/x/crypto v0.24.0 // indirect
 	golang.org/x/exp v0.0.0-20240604190554-fc45aab8b7f8 // indirect
 	golang.org/x/net v0.26.0 // indirect
