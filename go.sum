@@ -100,10 +100,8 @@ github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726 h1:91kehOTa299S
 github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726/go.mod h1:NYtaIY8a+Y8LYV9Y/nJb24zxx8mQyRK4h9k2oZDJveI=
 github.com/pentops/flowtest v0.0.0-20240623020118-02bf89f30b87 h1:O7ZZJfgIRPOke+nVH5yrENHARN+DquSIeP5yXc3yMZc=
 github.com/pentops/flowtest v0.0.0-20240623020118-02bf89f30b87/go.mod h1:5vX1QXxvMqOZb/KiJd4V2STThM6Q9OnHZIxAbv1Pprw=
-github.com/pentops/j5 v0.0.0-20240623181903-3517059dd99a h1:r26G0k2IWQ/PZj0mg96AaCMCsUy5LJtLcJZw8cKcFhA=
-github.com/pentops/j5 v0.0.0-20240623181903-3517059dd99a/go.mod h1:5gam/pNybAmaAx3qCiqEuxb1FuFgeibPdQkWy1dsbRM=
-github.com/pentops/j5 v0.0.0-20240628224728-c3821fbfe9d8 h1:x5ZKEDUzOmjT+SEqZd0lxyODTnlxioD9WisS7eh1f24=
-github.com/pentops/j5 v0.0.0-20240628224728-c3821fbfe9d8/go.mod h1:5gam/pNybAmaAx3qCiqEuxb1FuFgeibPdQkWy1dsbRM=
+github.com/pentops/j5 v0.0.0-20240630233950-623dde7a966a h1:Y14L50fr1Oqhav4gd7bwgHGKavSolbkpiEOOPmy86eA=
+github.com/pentops/j5 v0.0.0-20240630233950-623dde7a966a/go.mod h1:5gam/pNybAmaAx3qCiqEuxb1FuFgeibPdQkWy1dsbRM=
 github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a h1:7nGqA5BwbOwLzDQCNHSUdonuoFJaVxYVed9418jAokE=
 github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
 github.com/pentops/log.go v0.0.0-20240618224413-ed85018bafd9 h1:dDFQNUjn3j32t9YMBjfThw888JQCpmj+ucKiURTg71E=
