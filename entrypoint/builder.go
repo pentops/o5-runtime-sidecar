@@ -117,12 +117,12 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 
 		router := proxy.NewRouter(jsonapi_codec.NewCodec())
 
-		router.HealthCheck("/healthz", func() error {
+		router.SetHealthCheck("/healthz", func() error {
 			return nil
 		})
 
 		if len(envConfig.CORSOrigins) > 0 {
-			router.Use(cors.New(cors.Options{
+			router.AddMiddleware(cors.New(cors.Options{
 				AllowedOrigins:   envConfig.CORSOrigins,
 				AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 				AllowedHeaders:   []string{"*"},
