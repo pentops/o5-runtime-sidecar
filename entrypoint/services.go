@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/pentops/j5/gen/j5/ext/v1/ext_j5pb"
 	"github.com/pentops/j5/proxy"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-auth/gen/o5/auth/v1/auth_pb"
@@ -89,10 +90,27 @@ func (hs *routerServer) WaitFor(cb func(context.Context) error) {
 
 func (hs *routerServer) RegisterService(ctx context.Context, sd protoreflect.ServiceDescriptor, conn *grpc.ClientConn) error {
 
+	defaultAuth := authNotSpecified
+	if hs.globalAuth != nil {
+		defaultAuth = authJwtBearer
+	}
+
+	serviceExt := proto.GetExtension(sd.Options(), ext_j5pb.E_Service).(*ext_j5pb.ServiceOptions)
+	if serviceExt != nil {
+		if serviceExt.DefaultAuth != nil {
+			switch serviceExt.DefaultAuth.AuthMethod.(type) {
+			case *ext_j5pb.AuthMethodOptions_JwtBearer:
+				defaultAuth = authNone
+			case *ext_j5pb.AuthMethodOptions_None:
+				defaultAuth = authJwtBearer
+			}
+		}
+	}
+
 	methods := sd.Methods()
 	for ii := 0; ii < methods.Len(); ii++ {
 		method := methods.Get(ii)
-		if err := hs.RegisterMethod(ctx, method, conn); err != nil {
+		if err := hs.RegisterMethod(ctx, method, conn, defaultAuth); err != nil {
 			return fmt.Errorf("failed to register grpc method: %w", err)
 		}
 	}
@@ -100,7 +118,15 @@ func (hs *routerServer) RegisterService(ctx context.Context, sd protoreflect.Ser
 	return nil
 }
 
-func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.MethodDescriptor, conn *grpc.ClientConn) error {
+type authMethod int
+
+const (
+	authNotSpecified authMethod = iota
+	authNone
+	authJwtBearer
+)
+
+func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.MethodDescriptor, conn *grpc.ClientConn, auth authMethod) error {
 	methodConfig := proxy.GRPCMethodConfig{
 		Method:  md,
 		Invoker: conn,
@@ -108,37 +134,42 @@ func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.Meth
 
 	methodOptions := md.Options().(*descriptorpb.MethodOptions)
 
-	authOpt := proto.GetExtension(methodOptions, auth_pb.E_Auth).(*auth_pb.AuthMethodOptions)
-	if authOpt == nil {
-		// fallback to default if available
-		serviceOptions := md.Parent().Options().(*descriptorpb.ServiceOptions)
-		methodOpt := proto.GetExtension(serviceOptions, auth_pb.E_DefaultAuth).(*auth_pb.AuthMethodOptions)
-		if methodOpt != nil {
-			authOpt = methodOpt
+	if j5Method := proto.GetExtension(methodOptions, ext_j5pb.E_Method).(*ext_j5pb.MethodOptions); j5Method != nil {
+		switch j5Method.Auth.AuthMethod.(type) {
+		case *ext_j5pb.AuthMethodOptions_None:
+			auth = authNone // explicit auth method
+		case *ext_j5pb.AuthMethodOptions_JwtBearer:
+			auth = authJwtBearer // explicit auth method
 		}
-	}
-
-	if authOpt == nil {
-		// no auth is specified, use global auth if available
-		if hs.globalAuth != nil {
-			methodConfig.AuthHeaders = hs.globalAuth
-		} else {
-			// no auth is specified, and no global auth is available
-			methodConfig.AuthHeaders = nil
-		}
-	} else {
+	} else if authOpt := proto.GetExtension(methodOptions, auth_pb.E_Auth).(*auth_pb.AuthMethodOptions); authOpt != nil {
 		switch authOpt.AuthMethod.(type) {
 		case *auth_pb.AuthMethodOptions_None:
-			// nop but good for clarity
-			methodConfig.AuthHeaders = nil
-
+			auth = authNone
 		case *auth_pb.AuthMethodOptions_JwtBearer:
-			if hs.globalAuth == nil {
-				return fmt.Errorf("auth method %T requires global auth - no JWKS configured", authOpt.AuthMethod)
-			}
-			methodConfig.AuthHeaders = hs.globalAuth
+			auth = authJwtBearer
 		}
 	}
+
+	switch auth {
+
+	case authJwtBearer:
+		if hs.globalAuth == nil {
+			return fmt.Errorf("auth method specified as JWT, no JWKS configured")
+		}
+		methodConfig.AuthHeaders = hs.globalAuth
+
+	case authNone:
+		methodConfig.AuthHeaders = nil
+
+	case authNotSpecified:
+		if hs.globalAuth != nil {
+			methodConfig.AuthHeaders = hs.globalAuth
+		}
+
+	default:
+		return fmt.Errorf("auth method not supported (%d)", auth)
+	}
+
 	return hs.router.RegisterGRPCMethod(ctx, methodConfig)
 }
 
