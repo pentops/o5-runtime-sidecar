@@ -100,14 +100,12 @@ github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726 h1:91kehOTa299S
 github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726/go.mod h1:NYtaIY8a+Y8LYV9Y/nJb24zxx8mQyRK4h9k2oZDJveI=
 github.com/pentops/flowtest v0.0.0-20240623020118-02bf89f30b87 h1:O7ZZJfgIRPOke+nVH5yrENHARN+DquSIeP5yXc3yMZc=
 github.com/pentops/flowtest v0.0.0-20240623020118-02bf89f30b87/go.mod h1:5vX1QXxvMqOZb/KiJd4V2STThM6Q9OnHZIxAbv1Pprw=
-github.com/pentops/j5 v0.0.0-20240802193343-eacf50132ff7 h1:tr8I74LsexPhNP3OrvCnTbGrG1Rm0hP6K61fUN6BIl0=
-github.com/pentops/j5 v0.0.0-20240802193343-eacf50132ff7/go.mod h1:5gam/pNybAmaAx3qCiqEuxb1FuFgeibPdQkWy1dsbRM=
+github.com/pentops/j5 v0.0.0-20240803000121-f207c1a16de9 h1:Bupo6I8T3mA7WB4RFj17Edw++cSQFOZi8tuMBtOByxY=
+github.com/pentops/j5 v0.0.0-20240803000121-f207c1a16de9/go.mod h1:5gam/pNybAmaAx3qCiqEuxb1FuFgeibPdQkWy1dsbRM=
 github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a h1:7nGqA5BwbOwLzDQCNHSUdonuoFJaVxYVed9418jAokE=
 github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a/go.mod h1:l0Qkcz/wcg8SOcwgV4Okd4gffLtdglaFZNR7FBKktiI=
 github.com/pentops/log.go v0.0.0-20240618224413-ed85018bafd9 h1:dDFQNUjn3j32t9YMBjfThw888JQCpmj+ucKiURTg71E=
 github.com/pentops/log.go v0.0.0-20240618224413-ed85018bafd9/go.mod h1:UXhrs+VZ6cWZ7b/v8AtuvBZc5nwS5WFHP94JoFrZQA8=
-github.com/pentops/o5-auth v0.0.0-20240711024624-27c66d6f1d01 h1:+KzOUTJu+LdzerjingySe18AIiEBkUgbC1UcnfBqkQc=
-github.com/pentops/o5-auth v0.0.0-20240711024624-27c66d6f1d01/go.mod h1:TecVSivn+MNxBTwGYp3Xj/BpASxc4KTZjGDuMpc7dBo=
 github.com/pentops/o5-messaging v0.0.0-20240802182716-a8d0dc2a0eb0 h1:5qRFQnPYhjEoQfnk5i7zMUY82wzU+KoknvQBMP/+/pM=
 github.com/pentops/o5-messaging v0.0.0-20240802182716-a8d0dc2a0eb0/go.mod h1:aXyY7kDScVPxRzxkxpC0jmYPWiInLkTQDwzmE9NcFOM=
 github.com/pentops/runner v0.0.0-20240703154152-d1783f1a017c h1:E1gcJ6/72QLM+v9Q4kkxDDq4amUctFn4WHNkKb5STt4=

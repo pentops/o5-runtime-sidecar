@@ -6,19 +6,17 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/pentops/j5/gen/j5/ext/v1/ext_j5pb"
 	"github.com/pentops/j5/proxy"
+	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-auth/gen/o5/auth/v1/auth_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/adapter"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
+	"github.com/pentops/o5-runtime-sidecar/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 type adapterServer struct {
@@ -63,15 +61,15 @@ func (gg *adapterServer) Addr() string {
 }
 
 type proxyRouter interface {
-	RegisterGRPCMethod(ctx context.Context, method proxy.GRPCMethodConfig) error
+	RegisterGRPCService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker proxy.Invoker) error
 	ServeHTTP(http.ResponseWriter, *http.Request)
+	SetGlobalAuth(proxy.AuthHeaders)
 }
 
 type routerServer struct {
-	addr       string
-	listening  chan struct{}
-	router     proxyRouter
-	globalAuth proxy.AuthHeaders
+	addr      string
+	listening chan struct{}
+	router    proxyRouter
 
 	waitFor []func(context.Context) error
 }
@@ -88,89 +86,13 @@ func (hs *routerServer) WaitFor(cb func(context.Context) error) {
 	hs.waitFor = append(hs.waitFor, cb)
 }
 
-func (hs *routerServer) RegisterService(ctx context.Context, sd protoreflect.ServiceDescriptor, conn *grpc.ClientConn) error {
-
-	defaultAuth := authNotSpecified
-	if hs.globalAuth != nil {
-		defaultAuth = authJwtBearer
-	}
-
-	serviceExt := proto.GetExtension(sd.Options(), ext_j5pb.E_Service).(*ext_j5pb.ServiceOptions)
-	if serviceExt != nil {
-		if serviceExt.DefaultAuth != nil {
-			switch serviceExt.DefaultAuth.AuthMethod.(type) {
-			case *ext_j5pb.AuthMethodOptions_JwtBearer:
-				defaultAuth = authNone
-			case *ext_j5pb.AuthMethodOptions_None:
-				defaultAuth = authJwtBearer
-			}
-		}
-	}
-
-	methods := sd.Methods()
-	for ii := 0; ii < methods.Len(); ii++ {
-		method := methods.Get(ii)
-		if err := hs.RegisterMethod(ctx, method, conn, defaultAuth); err != nil {
-			return fmt.Errorf("failed to register grpc method: %w", err)
-		}
-	}
-
-	return nil
+func (hs *routerServer) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker proxy.Invoker) error {
+	return hs.router.RegisterGRPCService(ctx, service, invoker)
 }
 
-type authMethod int
-
-const (
-	authNotSpecified authMethod = iota
-	authNone
-	authJwtBearer
-)
-
-func (hs *routerServer) RegisterMethod(ctx context.Context, md protoreflect.MethodDescriptor, conn *grpc.ClientConn, auth authMethod) error {
-	methodConfig := proxy.GRPCMethodConfig{
-		Method:  md,
-		Invoker: conn,
-	}
-
-	methodOptions := md.Options().(*descriptorpb.MethodOptions)
-
-	if j5Method := proto.GetExtension(methodOptions, ext_j5pb.E_Method).(*ext_j5pb.MethodOptions); j5Method != nil {
-		switch j5Method.Auth.AuthMethod.(type) {
-		case *ext_j5pb.AuthMethodOptions_None:
-			auth = authNone // explicit auth method
-		case *ext_j5pb.AuthMethodOptions_JwtBearer:
-			auth = authJwtBearer // explicit auth method
-		}
-	} else if authOpt := proto.GetExtension(methodOptions, auth_pb.E_Auth).(*auth_pb.AuthMethodOptions); authOpt != nil {
-		switch authOpt.AuthMethod.(type) {
-		case *auth_pb.AuthMethodOptions_None:
-			auth = authNone
-		case *auth_pb.AuthMethodOptions_JwtBearer:
-			auth = authJwtBearer
-		}
-	}
-
-	switch auth {
-
-	case authJwtBearer:
-		if hs.globalAuth == nil {
-			return fmt.Errorf("auth method specified as JWT, no JWKS configured")
-		}
-		methodConfig.AuthHeaders = hs.globalAuth
-
-	case authNone:
-		methodConfig.AuthHeaders = nil
-
-	case authNotSpecified:
-		if hs.globalAuth != nil {
-			methodConfig.AuthHeaders = hs.globalAuth
-		}
-
-	default:
-		return fmt.Errorf("auth method not supported (%d)", auth)
-	}
-
-	return hs.router.RegisterGRPCMethod(ctx, methodConfig)
+func (hs *routerServer) SetJWKS(jwks *jwks.JWKSManager) {
+	globalAuth := proxy.AuthHeadersFunc(jwtauth.JWKSAuthFunc(jwks))
+	hs.router.SetGlobalAuth(globalAuth)
 }
 
 func (hs *routerServer) Run(ctx context.Context) error {
