@@ -13,7 +13,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20240607014745-65480a3da726
 	github.com/pentops/flowtest v0.0.0-20240623020118-02bf89f30b87
-	github.com/pentops/j5 v0.0.0-20240803000121-f207c1a16de9
+	github.com/pentops/j5 v0.0.0-20240803010150-e188cb318f63
 	github.com/pentops/jwtauth v0.0.0-20240606041710-01f57915a57a
 	github.com/pentops/log.go v0.0.0-20240618224413-ed85018bafd9
 	github.com/pentops/o5-messaging v0.0.0-20240802182716-a8d0dc2a0eb0
@@ -41,14 +41,12 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.24.5 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sts v1.28.12 // indirect
 	github.com/aws/smithy-go v1.20.2 // indirect
-	github.com/bufbuild/protocompile v0.14.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/iancoleman/strcase v0.2.0 // indirect
-	github.com/jhump/protoreflect v1.16.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
