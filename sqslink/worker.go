@@ -199,6 +199,17 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 	handler, ok := ww.services[fullServiceName]
 	if !ok {
 		log.Error(ctx, "no handler matched")
+		if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
+			log.Error(ctx, "Error handling message, leaving in queue")
+			return
+		}
+		err := ww.killMessage(ctx, msg, parsed, fmt.Errorf("no handler for %s", fullServiceName))
+		if err != nil {
+			log.WithField(ctx, "killError", err.Error()).
+				Error("Message Worker: Error killing message, leaving in queue")
+			return
+		}
+		log.Debug(ctx, "Message Handler: Killed")
 		return
 	}
 
