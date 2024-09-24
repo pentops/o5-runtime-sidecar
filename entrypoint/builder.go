@@ -120,6 +120,13 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 			return nil
 		})
 
+		router.AddMiddleware(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("X-Sidecar-Version", envConfig.SidecarVersion)
+				next.ServeHTTP(w, r)
+			})
+		})
+
 		if len(envConfig.CORSOrigins) > 0 {
 			router.AddMiddleware(cors.New(cors.Options{
 				AllowedOrigins:   envConfig.CORSOrigins,
