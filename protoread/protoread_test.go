@@ -14,7 +14,6 @@ type Service struct {
 }
 
 func TestProtoReadHappy(t *testing.T) {
-	t.Skip("Currently broken")
 	grpcPair := flowtest.NewGRPCPair(t)
 
 	service := &Service{}
@@ -26,7 +25,9 @@ func TestProtoReadHappy(t *testing.T) {
 
 	grpcPair.ServeUntilDone(t, ctx)
 
-	desc, err := FetchServices(ctx, grpcPair.Client)
+	cl := NewClient(grpcPair.Client)
+
+	desc, err := cl.FetchServices(ctx, grpcPair.Client)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	jsonapi_codec "github.com/pentops/j5/codec"
-	"github.com/pentops/j5/proxy"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
+	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/rs/cors"
 )
@@ -114,7 +113,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 
 	if envConfig.PublicAddr != "" {
 
-		router := proxy.NewRouter(jsonapi_codec.NewCodec())
+		router := proxy.NewRouter()
 
 		router.SetHealthCheck("/healthz", func() error {
 			return nil

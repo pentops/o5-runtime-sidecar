@@ -10,13 +10,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.34.3
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/mux v1.8.1
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20240806040806-dcab509e8c71
 	github.com/pentops/flowtest v0.0.0-20240917192406-c387da443c68
-	github.com/pentops/j5 v0.0.0-20240924044233-a49f5f870218
+	github.com/pentops/j5 v0.0.0-20240927231129-f21a9093b647
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
 	github.com/pentops/log.go v0.0.0-20240806161938-2742d05b4c24
-	github.com/pentops/o5-messaging v0.0.0-20240917175438-554bc6c7bc73
+	github.com/pentops/o5-messaging v0.0.0-20240925203152-81b197123419
 	github.com/pentops/runner v0.0.0-20240920235254-d99051980854
 	github.com/pentops/sqrlx.go v0.0.0-20240806064322-33adc0ac5bd4
 	github.com/rs/cors v1.11.0
@@ -43,7 +44,6 @@ require (
 	github.com/aws/smithy-go v1.20.3 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.17.0 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

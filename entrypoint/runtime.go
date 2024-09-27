@@ -119,7 +119,9 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error 
 	}
 	rt.connections = append(rt.connections, conn)
 
-	services, err := protoread.FetchServices(ctx, conn)
+	prClient := protoread.NewClient(conn)
+
+	services, err := prClient.FetchServices(ctx, conn)
 	if err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}
@@ -131,7 +133,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error 
 			if rt.routerServer == nil {
 				return fmt.Errorf("service %s requires a public port", name)
 			}
-			if err := rt.routerServer.RegisterService(ctx, ss, conn); err != nil {
+			if err := rt.routerServer.RegisterService(ctx, ss, prClient); err != nil {
 				return fmt.Errorf("register service %s: %w", name, err)
 			}
 		case strings.HasSuffix(name, "Topic"):

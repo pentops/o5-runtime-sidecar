@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/pentops/j5/proxy"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
@@ -14,6 +13,7 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
+	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -61,7 +61,7 @@ func (gg *adapterServer) Addr() string {
 }
 
 type proxyRouter interface {
-	RegisterGRPCService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker proxy.Invoker) error
+	RegisterGRPCService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker proxy.AppConn) error
 	ServeHTTP(http.ResponseWriter, *http.Request)
 	SetGlobalAuth(proxy.AuthHeaders)
 }
@@ -86,7 +86,7 @@ func (hs *routerServer) WaitFor(cb func(context.Context) error) {
 	hs.waitFor = append(hs.waitFor, cb)
 }
 
-func (hs *routerServer) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker proxy.Invoker) error {
+func (hs *routerServer) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker proxy.AppConn) error {
 	return hs.router.RegisterGRPCService(ctx, service, invoker)
 }
 
