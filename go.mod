@@ -14,7 +14,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20240806040806-dcab509e8c71
 	github.com/pentops/flowtest v0.0.0-20240917192406-c387da443c68
-	github.com/pentops/j5 v0.0.0-20240927231129-f21a9093b647
+	github.com/pentops/j5 v0.0.0-20240928020157-88816fe22c17
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
 	github.com/pentops/log.go v0.0.0-20240806161938-2742d05b4c24
 	github.com/pentops/o5-messaging v0.0.0-20240925203152-81b197123419
