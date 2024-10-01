@@ -14,16 +14,16 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20240806040806-dcab509e8c71
 	github.com/pentops/flowtest v0.0.0-20240917192406-c387da443c68
-	github.com/pentops/j5 v0.0.0-20240928020157-88816fe22c17
+	github.com/pentops/j5 v0.0.0-20241001000547-80229b8bcdcc
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
-	github.com/pentops/log.go v0.0.0-20240806161938-2742d05b4c24
+	github.com/pentops/log.go v0.0.0-20240930194039-e8e09c525e33
 	github.com/pentops/o5-messaging v0.0.0-20240925203152-81b197123419
 	github.com/pentops/runner v0.0.0-20240920235254-d99051980854
 	github.com/pentops/sqrlx.go v0.0.0-20240806064322-33adc0ac5bd4
 	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240903143218-8af14fe29dc1
-	google.golang.org/grpc v1.66.0
+	google.golang.org/grpc v1.67.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
@@ -51,12 +51,12 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
-	golang.org/x/crypto v0.26.0 // indirect
-	golang.org/x/exp v0.0.0-20240904232852-e7e105dedf7e // indirect
-	golang.org/x/net v0.27.0 // indirect
+	golang.org/x/crypto v0.27.0 // indirect
+	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
+	golang.org/x/net v0.29.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240930140551-af27646dc61f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
