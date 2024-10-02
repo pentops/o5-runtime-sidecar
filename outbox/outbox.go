@@ -160,7 +160,7 @@ func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error)
 		"id",
 		"data",
 	).From("outbox").
-		Limit(100).
+		Limit(10).
 		Suffix("FOR UPDATE SKIP LOCKED")
 
 	var count int
