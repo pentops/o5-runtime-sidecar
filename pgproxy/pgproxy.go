@@ -64,6 +64,17 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 		"user":     beStartupData.User,
 		"database": beStartupData.Database,
 	})
+	if beStartupData.ProtocolVersion != pgproto3.ProtocolVersionNumber {
+		// TODO: The pgproto version is pre-set, we need to negotiate with the
+		// client if required, or take over the whole auth flow with the server
+		if beStartupData.ProtocolVersion < pgproto3.ProtocolVersionNumber {
+			log.WithField(ctx, "version", beStartupData.ProtocolVersion).Warn("protocol version mismatch")
+		} else {
+			log.WithField(ctx, "version", beStartupData.ProtocolVersion).Error("protocol version not supported")
+			return
+		}
+
+	}
 	log.WithField(ctx, "data", beStartupData).Info("client startup")
 
 	server, err := ln.connectToServer(ctx, *beStartupData)
@@ -73,7 +84,7 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 	defer server.Close()
 
 	client.Send(&pgproto3.AuthenticationOk{})
-	client.Send(&pgproto3.ReadyForQuery{TxStatus: 'I'})
+	client.Send(&pgproto3.ReadyForQuery{TxStatus: TxStatusIdle})
 	err = client.Flush()
 	if err != nil {
 		log.WithError(ctx, err).Error("failed to send ready for query")
@@ -109,6 +120,7 @@ func (ln *Listener) connectToServer(ctx context.Context, beStartupData StartupDa
 	if err != nil {
 		return nil, fmt.Errorf("parsing backend config: %w", err)
 	}
+
 	conn, err := pgconn.ConnectConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to %s: %w", cfg.Host, err)
@@ -140,8 +152,9 @@ func (ln *Listener) connectToServer(ctx context.Context, beStartupData StartupDa
 const TxStatusIdle = 'I'
 
 type StartupData struct {
-	User     string
-	Database string
+	User            string
+	Database        string
+	ProtocolVersion uint32
 }
 
 func clientHandshake(be *pgproto3.Backend) (*StartupData, error) {
@@ -181,14 +194,12 @@ func clientHandshake(be *pgproto3.Backend) (*StartupData, error) {
 			return nil, fmt.Errorf("options are not supported")
 		}
 
-		// mt.ProtocolVersion
-		// TODO: The pgproto version is pre-set, we need to negotiate with the
-		// client if required.
-
 		return &StartupData{
-			User:     user,
-			Database: db,
+			User:            user,
+			Database:        db,
+			ProtocolVersion: mt.ProtocolVersion,
 		}, nil
+
 	case *pgproto3.SSLRequest:
 		be.Send(&pgproto3.ErrorResponse{Message: "SSL connections are not supported"})
 		return nil, fmt.Errorf("ssl request received")
@@ -210,7 +221,7 @@ type receiver[T any] interface {
 
 var ErrTerminate = fmt.Errorf("terminate")
 
-func copyFrom[T pgproto3.Message](ctx context.Context, from receiver[T], to chan T) func() error {
+func copyFrom[T pgproto3.Message](ctx context.Context, from receiver[T], to sender[T]) func() error {
 
 	return func() error {
 		var terminate bool
@@ -226,31 +237,19 @@ func copyFrom[T pgproto3.Message](ctx context.Context, from receiver[T], to chan
 			} else {
 				log.WithField(ctx, "msg", msg).Debug("received message")
 			}
-			select {
-			case to <- msg:
-			case <-ctx.Done():
-				return nil
+			to.Send(msg)
+			err = to.Flush()
+			if err != nil {
+				return fmt.Errorf("flush: %w", err)
 			}
 			if terminate {
 				// The normal, graceful termination procedure is that the frontend sends a Terminate message and immediately closes the connection. On receipt of this message, the backend closes the connection and terminates.
 				return ErrTerminate
 			}
-		}
-	}
-}
-
-func copyTo[T any](ctx context.Context, from chan T, to sender[T]) func() error {
-	return func() error {
-		for {
 			select {
-			case msg := <-from:
-				to.Send(msg)
-				err := to.Flush()
-				if err != nil {
-					return err
-				}
 			case <-ctx.Done():
 				return nil
+			default:
 			}
 		}
 	}
@@ -259,13 +258,8 @@ func copyTo[T any](ctx context.Context, from chan T, to sender[T]) func() error 
 func passthrough(ctx context.Context, client *pgproto3.Backend, server *pgproto3.Frontend) error {
 	eg, ctx := errgroup.WithContext(ctx)
 
-	clientMsgs := make(chan pgproto3.FrontendMessage)
-	serverMsgs := make(chan pgproto3.BackendMessage)
-
-	eg.Go(copyFrom(log.WithField(ctx, "conn", "fromServer"), server, serverMsgs))
-	eg.Go(copyTo(ctx, serverMsgs, client))
-	eg.Go(copyFrom(log.WithField(ctx, "conn", "fromClient"), client, clientMsgs))
-	eg.Go(copyTo(ctx, clientMsgs, server))
+	eg.Go(copyFrom(log.WithField(ctx, "conn", "fromServer"), server, client))
+	eg.Go(copyFrom(log.WithField(ctx, "conn", "fromClient"), client, server))
 
 	err := eg.Wait()
 	if err == ErrTerminate {
