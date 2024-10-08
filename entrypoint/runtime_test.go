@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/rs/cors"
 	"github.com/stretchr/testify/assert"
 )
@@ -55,6 +56,14 @@ func (ta TestAWS) EventBridge() EventBridgeAPI {
 	return nil
 }
 
+func (ta TestAWS) Region() string {
+	return "local"
+}
+
+func (ta TestAWS) Credentials() aws.CredentialsProvider {
+	return nil
+}
+
 func TestLoader(t *testing.T) {
 
 	runtime, err := FromConfig(Config{}, TestAWS{})
@@ -72,8 +81,10 @@ func TestLoader(t *testing.T) {
 func TestLoadEverything(t *testing.T) {
 
 	runtime, err := FromConfig(Config{
-		PublicAddr:  ":0",
-		CORSOrigins: []string{"*"},
+		ServerConfig: ServerConfig{
+			PublicAddr:  ":0",
+			CORSOrigins: []string{"*"},
+		},
 	}, TestAWS{})
 	assert.NoError(t, err)
 

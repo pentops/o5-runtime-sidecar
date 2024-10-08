@@ -27,6 +27,14 @@ func (acb *AWSConfigBuilder) EventBridge() EventBridgeAPI {
 	return eventbridge.NewFromConfig(acb.config)
 }
 
+func (acb *AWSConfigBuilder) Region() string {
+	return acb.config.Region
+}
+
+func (acb *AWSConfigBuilder) Credentials() aws.CredentialsProvider {
+	return acb.config.Credentials
+}
+
 func NewAWSConfigBuilder(provided aws.Config) *AWSConfigBuilder {
 	return &AWSConfigBuilder{config: provided}
 }
@@ -43,6 +51,9 @@ type AWSProvider interface {
 	SNS() SNSAPI
 	SQS() SQSAPI
 	EventBridge() EventBridgeAPI
+
+	Region() string
+	Credentials() aws.CredentialsProvider
 }
 
 // SNSAPI is an interface for the SNS client which satisfies the interfaces of

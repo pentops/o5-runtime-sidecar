@@ -26,6 +26,7 @@ type Runtime struct {
 	adapter         *adapterServer
 	routerServer    *routerServer
 	outboxListeners []*outboxListener
+	postgresProxy   *postgresProxy
 
 	connections []io.Closer
 	endpoints   []string
@@ -78,6 +79,11 @@ func (rt *Runtime) buildRunGroup() (*runner.Group, error) {
 	if rt.adapter != nil {
 		didAnything = true
 		runGroup.Add("adapter", rt.adapter.Run)
+	}
+
+	if rt.postgresProxy != nil {
+		didAnything = true
+		runGroup.Add("postgres-proxy", rt.postgresProxy.Run)
 	}
 
 	if !didAnything {

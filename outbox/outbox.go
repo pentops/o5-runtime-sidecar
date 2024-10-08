@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"time"
 
 	sq "github.com/elgris/sqrl"
@@ -22,11 +23,12 @@ type Batcher interface {
 
 type Listener struct {
 	dbURL     string
+	dialer    pq.Dialer
 	source    awsmsg.SourceConfig
 	publisher Batcher
 }
 
-func NewListener(dbURL string, publisher Batcher, sourceConfig awsmsg.SourceConfig) (*Listener, error) {
+func NewListener(dbURL string, dialer pq.Dialer, publisher Batcher, sourceConfig awsmsg.SourceConfig) (*Listener, error) {
 	_, err := pq.ParseURL(dbURL)
 	if err != nil {
 		// the URL can contain secrets, so we don't want to log it... but it
@@ -35,19 +37,33 @@ func NewListener(dbURL string, publisher Batcher, sourceConfig awsmsg.SourceConf
 	}
 	return &Listener{
 		dbURL:     dbURL,
+		dialer:    dialer,
 		source:    sourceConfig,
 		publisher: publisher,
 	}, nil
 }
 
+type NetDialer struct{}
+
+func (NetDialer) Dial(network, address string) (net.Conn, error) {
+	return net.Dial(network, address)
+}
+
+func (NetDialer) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout(network, address, timeout)
+}
+
 func (ll *Listener) Listen(ctx context.Context) error {
 
-	db, err := sql.Open("postgres", ll.dbURL)
+	connector, err := pq.NewConnector(ll.dbURL)
 	if err != nil {
 		return err
 	}
+	connector.Dialer(ll.dialer)
 
-	pqListener := pq.NewListener(ll.dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
+	db := sql.OpenDB(connector)
+
+	pqListener := pq.NewDialListener(ll.dialer, ll.dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
 		if err != nil {
 			log.WithError(ctx, err).Error("error in listener")
 		}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/pentops/log.go/log"
 	"golang.org/x/sync/errgroup"
@@ -13,52 +14,47 @@ import (
 	"github.com/jackc/pgx/v5/pgproto3"
 )
 
-type Listener struct {
-	rdsClient AuthClient
-}
-
 type AuthClient interface {
 	NewConnectionString(ctx context.Context, dbName, userName string) (string, error)
 }
 
-func NewListener(rdsClient AuthClient) (*Listener, error) {
-	return &Listener{
-		rdsClient: rdsClient,
+type Connector struct {
+	authClient AuthClient
+}
+
+func NewConnector(authClient AuthClient) (*Connector, error) {
+	return &Connector{
+		authClient: authClient,
 	}, nil
 }
 
-func (l *Listener) Listen(ctx context.Context, bind string) error {
-	ln, err := net.Listen("tcp", bind)
-	if err != nil {
-		return err
-	}
-
-	log.WithField(ctx, "bind", bind).Info("pgproxy: Ready")
-
+func (cc *Connector) runPipe() (net.Conn, error) {
+	a, b := net.Pipe()
+	ctx := context.Background()
 	go func() {
-		<-ctx.Done()
-		ln.Close()
-	}()
-
-	for {
-		conn, err := ln.Accept()
+		err := cc.RunConn(ctx, b)
 		if err != nil {
-			return err
+			log.WithError(ctx, err).Error("pgproxy: error running proxy")
 		}
-		go l.newConn(ctx, conn)
-	}
+	}()
+	return a, nil
 }
 
-func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
-	defer clientConn.Close()
-	ctx = log.WithField(ctx, "clientAddr", clientConn.RemoteAddr().String())
+func (cc *Connector) Dial(network, address string) (net.Conn, error) {
+	return cc.runPipe()
+}
+
+func (cc *Connector) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
+	return cc.runPipe()
+}
+
+func (ln *Connector) RunConn(ctx context.Context, clientConn io.ReadWriter) error {
 
 	// Client == Backend the PG Protocol implements what a server implements.
 	client := pgproto3.NewBackend(clientConn, clientConn)
 	beStartupData, err := clientHandshake(client)
 	if err != nil {
-		log.WithError(ctx, err).Error("failed to handshake with client")
-		return
+		return fmt.Errorf("client handshake: %w", err)
 	}
 	ctx = log.WithFields(ctx, map[string]interface{}{
 		"user":     beStartupData.User,
@@ -71,7 +67,7 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 			log.WithField(ctx, "version", beStartupData.ProtocolVersion).Warn("protocol version mismatch")
 		} else {
 			log.WithField(ctx, "version", beStartupData.ProtocolVersion).Error("protocol version not supported")
-			return
+			return fmt.Errorf("protocol version not supported")
 		}
 
 	}
@@ -87,14 +83,16 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 	client.Send(&pgproto3.ReadyForQuery{TxStatus: TxStatusIdle})
 	err = client.Flush()
 	if err != nil {
-		log.WithError(ctx, err).Error("failed to send ready for query")
-		return
+		return fmt.Errorf("failed to send ready for query: %w", err)
 	}
 
 	err = passthrough(ctx, client, server.Frontend)
+
 	if err != nil {
-		log.WithError(ctx, err).Error("failed to copy steady state")
+		return fmt.Errorf("failed to run stable passthrough: %w", err)
 	}
+
+	return nil
 }
 
 type Frontend struct {
@@ -106,10 +104,10 @@ func (f *Frontend) Close() {
 	f.conn.Close()
 }
 
-func (ln *Listener) connectToServer(ctx context.Context, beStartupData StartupData) (*Frontend, error) {
+func (ln *Connector) connectToServer(ctx context.Context, beStartupData StartupData) (*Frontend, error) {
 
 	// TODO: Cache Tokens... but I don't know how to check TTL
-	endpoint, err := ln.rdsClient.NewConnectionString(ctx, beStartupData.Database, beStartupData.User)
+	endpoint, err := ln.authClient.NewConnectionString(ctx, beStartupData.Database, beStartupData.User)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection string: %w", err)
 	}

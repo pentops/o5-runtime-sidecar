@@ -59,3 +59,12 @@ func (cb *CredBuilder) NewConnectionString(ctx context.Context, dbName, userName
 		dbName), nil
 
 }
+
+type CredMap map[string]AuthClient
+
+func (cm CredMap) NewConnectionString(ctx context.Context, dbName, userName string) (string, error) {
+	if cb, ok := cm[dbName]; ok {
+		return cb.NewConnectionString(ctx, dbName, userName)
+	}
+	return "", fmt.Errorf("no credentials found for %s", dbName)
+}

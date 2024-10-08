@@ -37,12 +37,17 @@ func runPgProxy(ctx context.Context, args struct {
 		return err
 	}
 
-	listener, err := pgproxy.NewListener(builder)
+	connector, err := pgproxy.NewConnector(builder)
 	if err != nil {
 		return err
 	}
 
-	return listener.Listen(ctx, fmt.Sprintf(":%d", args.Port))
+	listener, err := pgproxy.NewListener(connector, fmt.Sprintf(":%d", args.Port))
+	if err != nil {
+		return err
+	}
+
+	return listener.Listen(ctx)
 }
 
 func runPgUrl(ctx context.Context, args struct {

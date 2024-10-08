@@ -12,7 +12,6 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/adapter"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/jwtauth"
-	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -128,25 +127,4 @@ func (hs *routerServer) Run(ctx context.Context) error {
 func (hs *routerServer) Addr() string {
 	<-hs.listening
 	return hs.addr
-}
-
-type outboxListener struct {
-	Name string
-	*outbox.Listener
-}
-
-func newOutboxListener(name string, uri string, batcher outbox.Batcher, source awsmsg.SourceConfig) (*outboxListener, error) {
-	ll, err := outbox.NewListener(uri, batcher, source)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create outbox listener: %w", err)
-	}
-
-	return &outboxListener{
-		Name:     name,
-		Listener: ll,
-	}, nil
-}
-
-func (ol *outboxListener) Run(ctx context.Context) error {
-	return ol.Listener.Listen(ctx)
 }
