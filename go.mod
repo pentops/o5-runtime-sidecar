@@ -14,7 +14,7 @@ require (
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/lib/pq v1.10.9
-	github.com/pentops/envconf.go v0.0.0-20240806040806-dcab509e8c71
+	github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d
 	github.com/pentops/flowtest v0.0.0-20240917192406-c387da443c68
 	github.com/pentops/j5 v0.0.0-20241001000547-80229b8bcdcc
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
