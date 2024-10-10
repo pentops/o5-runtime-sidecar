@@ -58,16 +58,12 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	didAnything := false
 	if rt.postgresProxy != nil {
 		didAnything = true
-		if err := runGroup.Add("postgres-proxy", rt.postgresProxy.Run); err != nil {
-			return fmt.Errorf("add postgres-proxy: %w", err)
-		}
+		runGroup.Add("postgres-proxy", rt.postgresProxy.Run)
 	}
 
 	if rt.adapter != nil {
 		didAnything = true
-		if err := runGroup.Add("adapter", rt.adapter.Run); err != nil {
-			return fmt.Errorf("add adapter: %w", err)
-		}
+		runGroup.Add("adapter", rt.adapter.Run)
 	}
 
 	if err := runGroup.Start(ctx); err != nil {
@@ -75,7 +71,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	}
 
 	rt.endpointWait = make(chan struct{})
-	if err := runGroup.Add("register-endpoints", func(ctx context.Context) error {
+	runGroup.Add("register-endpoints", func(ctx context.Context) error {
 		defer close(rt.endpointWait)
 		for _, endpoint := range rt.endpoints {
 			endpoint := endpoint
@@ -84,22 +80,16 @@ func (rt *Runtime) Run(ctx context.Context) error {
 			}
 		}
 		return nil
-	}); err != nil {
-		return fmt.Errorf("add register-endpoints: %w", err)
-	}
+	})
 
 	if rt.jwks != nil {
 		// doesn't count as doing anything
-		if err := runGroup.Add("jwks", rt.jwks.Run); err != nil {
-			return fmt.Errorf("add jwks: %w", err)
-		}
+		runGroup.Add("jwks", rt.jwks.Run)
 	}
 
 	for _, outbox := range rt.outboxListeners {
 		didAnything = true
-		if err := runGroup.Add(outbox.Name, outbox.Run); err != nil {
-			return fmt.Errorf("add outbox %s: %w", outbox.Name, err)
-		}
+		runGroup.Add(outbox.Name, outbox.Run)
 	}
 
 	<-rt.endpointWait
@@ -108,17 +98,13 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		// TODO: Metrics
 		didAnything = true
 
-		if err := runGroup.Add("router", rt.routerServer.Run); err != nil {
-			return fmt.Errorf("add router: %w", err)
-		}
+		runGroup.Add("router", rt.routerServer.Run)
 
 	}
 
 	if rt.queueWorker != nil {
 		didAnything = true
-		if err := runGroup.Add("worker", rt.queueWorker.Run); err != nil {
-			return fmt.Errorf("add worker: %w", err)
-		}
+		runGroup.Add("worker", rt.queueWorker.Run)
 	}
 
 	if !didAnything {

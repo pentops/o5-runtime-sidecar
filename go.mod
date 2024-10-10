@@ -20,7 +20,7 @@ require (
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
 	github.com/pentops/log.go v0.0.0-20240930194039-e8e09c525e33
 	github.com/pentops/o5-messaging v0.0.0-20240925203152-81b197123419
-	github.com/pentops/runner v0.0.0-20240920235254-d99051980854
+	github.com/pentops/runner v0.0.0-20241010184552-1a959b902d93
 	github.com/pentops/sqrlx.go v0.0.0-20240806064322-33adc0ac5bd4
 	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.9.0
@@ -64,5 +64,3 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240930140551-af27646dc61f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/pentops/runner => /Users/daemonl/pentops/runner
