@@ -69,8 +69,6 @@ type routerServer struct {
 	addr      string
 	listening chan struct{}
 	router    proxyRouter
-
-	waitFor []func(context.Context) error
 }
 
 func newRouterServer(addr string, router proxyRouter) *routerServer {
@@ -79,10 +77,6 @@ func newRouterServer(addr string, router proxyRouter) *routerServer {
 		addr:      addr,
 		listening: make(chan struct{}),
 	}
-}
-
-func (hs *routerServer) WaitFor(cb func(context.Context) error) {
-	hs.waitFor = append(hs.waitFor, cb)
 }
 
 func (hs *routerServer) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker proxy.AppConn) error {
@@ -95,12 +89,6 @@ func (hs *routerServer) SetJWKS(jwks *jwks.JWKSManager) {
 }
 
 func (hs *routerServer) Run(ctx context.Context) error {
-	for _, ch := range hs.waitFor {
-		if err := ch(ctx); err != nil {
-			return err
-		}
-	}
-
 	lis, err := net.Listen("tcp", hs.addr)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)

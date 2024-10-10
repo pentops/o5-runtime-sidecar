@@ -29,6 +29,7 @@ func NewConnector(authClient AuthClient) (*Connector, error) {
 }
 
 func (cc *Connector) runPipe() (net.Conn, error) {
+	fmt.Println("runPipe")
 	a, b := net.Pipe()
 	ctx := context.Background()
 	go func() {
@@ -36,6 +37,7 @@ func (cc *Connector) runPipe() (net.Conn, error) {
 		if err != nil {
 			log.WithError(ctx, err).Error("pgproxy: error running proxy")
 		}
+		fmt.Println("runPipe done")
 	}()
 	return a, nil
 }
@@ -52,7 +54,7 @@ func (ln *Connector) RunConn(ctx context.Context, clientConn io.ReadWriter) erro
 
 	// Client == Backend the PG Protocol implements what a server implements.
 	client := pgproto3.NewBackend(clientConn, clientConn)
-	beStartupData, err := clientHandshake(client)
+	beStartupData, err := clientHandshake(ctx, client)
 	if err != nil {
 		return fmt.Errorf("client handshake: %w", err)
 	}
@@ -71,13 +73,17 @@ func (ln *Connector) RunConn(ctx context.Context, clientConn io.ReadWriter) erro
 		}
 
 	}
-	log.WithField(ctx, "data", beStartupData).Info("client startup")
+	log.WithField(ctx, "data", beStartupData).Info("client connected")
 
 	server, err := ln.connectToServer(ctx, *beStartupData)
 	if err != nil {
 		log.WithError(ctx, err).Error("failed to connect to server")
+		_ = beFatal(ctx, client, "failed to connect to server")
+		return fmt.Errorf("failed to connect to server: %w", err)
 	}
 	defer server.Close()
+
+	log.Debug(ctx, "server connected")
 
 	client.Send(&pgproto3.AuthenticationOk{})
 	client.Send(&pgproto3.ReadyForQuery{TxStatus: TxStatusIdle})
@@ -101,6 +107,7 @@ type Frontend struct {
 }
 
 func (f *Frontend) Close() {
+
 	f.conn.Close()
 }
 
@@ -114,16 +121,20 @@ func (ln *Connector) connectToServer(ctx context.Context, beStartupData StartupD
 
 	// Use PGX to connect and log in
 
+	log.WithField(ctx, "endpoint", endpoint).Debug("connecting to backend")
 	cfg, err := pgconn.ParseConfig(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("parsing backend config: %w", err)
 	}
+
+	log.WithField(ctx, "host", cfg.Host).Debug("connecting to backend")
 
 	conn, err := pgconn.ConnectConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to %s: %w", cfg.Host, err)
 	}
 
+	log.WithField(ctx, "host", cfg.Host).Debug("connected")
 	// Exit the PGX wrapper, we only needed it for auth.
 
 	err = conn.SyncConn(ctx)
@@ -155,7 +166,15 @@ type StartupData struct {
 	ProtocolVersion uint32
 }
 
-func clientHandshake(be *pgproto3.Backend) (*StartupData, error) {
+func beFatal(ctx context.Context, be *pgproto3.Backend, msg string) error {
+	be.Send(&pgproto3.ErrorResponse{
+		Severity: "FATAL",
+		Message:  "no user in startup message",
+	})
+	be.Flush()
+	return fmt.Errorf(msg)
+}
+func clientHandshake(ctx context.Context, be *pgproto3.Backend) (*StartupData, error) {
 	msg, err := be.ReceiveStartupMessage()
 	if err != nil {
 		return nil, fmt.Errorf("failed to receive startup message: %w", err)
@@ -165,11 +184,7 @@ func clientHandshake(be *pgproto3.Backend) (*StartupData, error) {
 	case *pgproto3.StartupMessage:
 		user, ok := mt.Parameters["user"]
 		if !ok {
-			be.Send(&pgproto3.ErrorResponse{
-				Severity: "FATAL",
-				Message:  "no user in startup message",
-			})
-			return nil, fmt.Errorf("no user in startup message")
+			return nil, beFatal(ctx, be, "no user in startup message")
 		}
 		db, ok := mt.Parameters["database"]
 		if !ok {
@@ -177,19 +192,11 @@ func clientHandshake(be *pgproto3.Backend) (*StartupData, error) {
 		}
 
 		if _, ok := mt.Parameters["replication"]; ok {
-			be.Send(&pgproto3.ErrorResponse{
-				Severity: "FATAL",
-				Message:  "replication connections are not supported",
-			})
-			return nil, fmt.Errorf("replication connections are not supported")
+			return nil, beFatal(ctx, be, "replication is not supported")
 		}
 
 		if _, ok := mt.Parameters["options"]; ok {
-			be.Send(&pgproto3.ErrorResponse{
-				Severity: "FATAL",
-				Message:  "options are not supported",
-			})
-			return nil, fmt.Errorf("options are not supported")
+			return nil, beFatal(ctx, be, "options is not supported")
 		}
 
 		return &StartupData{
@@ -199,8 +206,7 @@ func clientHandshake(be *pgproto3.Backend) (*StartupData, error) {
 		}, nil
 
 	case *pgproto3.SSLRequest:
-		be.Send(&pgproto3.ErrorResponse{Message: "SSL connections are not supported"})
-		return nil, fmt.Errorf("ssl request received")
+		return nil, beFatal(ctx, be, "ssl connections are not supported")
 	case *pgproto3.CancelRequest:
 		return nil, fmt.Errorf("cancel request received")
 	default:

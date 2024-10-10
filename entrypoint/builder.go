@@ -29,7 +29,7 @@ type WorkerConfig struct {
 type PostgresConfig struct {
 	PostgresOutboxURI []string `env:"POSTGRES_OUTBOX" default:""`
 	PostgresProxy     []string `env:"POSTGRES_IAM_PROXY" default:""`
-	PostgresProxyBind string   `env:"POSTGRES_PROXY_BIND" default:"5432"`
+	PostgresProxyBind string   `env:"POSTGRES_PROXY_BIND" default:":5432"`
 }
 
 type Config struct {

@@ -55,6 +55,33 @@ func (NetDialer) DialTimeout(network, address string, timeout time.Duration) (ne
 
 func (ll *Listener) Listen(ctx context.Context) error {
 
+	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	pqListener := pq.NewDialListener(ll.dialer, ll.dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
+		if err != nil {
+			log.WithError(ctx, err).Error("error in listener")
+		}
+	})
+	var closed error
+	go func() {
+		<-dialContext.Done()
+		closed = dialContext.Err()
+		pqListener.Close()
+	}()
+	for {
+		if closed != nil {
+			return closed
+		}
+		if err := pqListener.Ping(); err != nil {
+			log.WithError(ctx, err).Warn("pinging Listener PG")
+			time.Sleep(time.Second)
+			continue
+		}
+		log.Info(ctx, "pinging Listener PG OK")
+		break
+	}
+
 	connector, err := pq.NewConnector(ll.dbURL)
 	if err != nil {
 		return err
@@ -62,30 +89,6 @@ func (ll *Listener) Listen(ctx context.Context) error {
 	connector.Dialer(ll.dialer)
 
 	db := sql.OpenDB(connector)
-
-	pqListener := pq.NewDialListener(ll.dialer, ll.dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
-		if err != nil {
-			log.WithError(ctx, err).Error("error in listener")
-		}
-	})
-	closed := false
-	go func() {
-		<-ctx.Done()
-		closed = true
-		pqListener.Close()
-	}()
-	for {
-		if closed {
-			return nil
-		}
-		if err := pqListener.Ping(); err != nil {
-			log.WithError(ctx, err).Error("pinging Listener PG")
-			time.Sleep(time.Second)
-			continue
-		}
-		log.Info(ctx, "pinging Listener PG OK")
-		break
-	}
 
 	dbWrapped, err := sqrlx.New(db, sq.Dollar)
 	if err != nil {

@@ -72,7 +72,7 @@ func buildPostgres(raw string) (*postgresConn, error) {
 		return nil, fmt.Errorf("invalid JSON in $DB_CREDS_%s: %w", raw, err)
 	}
 
-	dsn := fmt.Sprintf("user=%s dbname=%s",
+	dsn := fmt.Sprintf("postgres://%s@localhost:5432/%s?sslmode=disable",
 		arg.DbUser,
 		arg.DbUser,
 	)
@@ -114,7 +114,7 @@ func newPostgresProxy(awsProvider AWSProvider, bind string, conns []*postgresCon
 		if err != nil {
 			return nil, fmt.Errorf("building postgres connection: %w", err)
 		}
-		builders[conn.Aurora.DbName] = builder
+		builders[conn.Name] = builder
 	}
 
 	connector, err := pgproxy.NewConnector(builders)

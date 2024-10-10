@@ -28,8 +28,9 @@ type Runtime struct {
 	outboxListeners []*outboxListener
 	postgresProxy   *postgresProxy
 
-	connections []io.Closer
-	endpoints   []string
+	connections  []io.Closer
+	endpoints    []string
+	endpointWait chan struct{}
 }
 
 func NewRuntime() *Runtime {
@@ -45,7 +46,9 @@ func (rt *Runtime) Close() error {
 	return nil
 }
 
-func (rt *Runtime) buildRunGroup() (*runner.Group, error) {
+func (rt *Runtime) Run(ctx context.Context) error {
+	log.Debug(ctx, "Sidecar Running")
+	defer rt.Close()
 
 	runGroup := runner.NewGroup(
 		runner.WithName("runtime"),
@@ -53,62 +56,76 @@ func (rt *Runtime) buildRunGroup() (*runner.Group, error) {
 	)
 
 	didAnything := false
+	if rt.postgresProxy != nil {
+		didAnything = true
+		if err := runGroup.Add("postgres-proxy", rt.postgresProxy.Run); err != nil {
+			return fmt.Errorf("add postgres-proxy: %w", err)
+		}
+	}
+
+	if rt.adapter != nil {
+		didAnything = true
+		if err := runGroup.Add("adapter", rt.adapter.Run); err != nil {
+			return fmt.Errorf("add adapter: %w", err)
+		}
+	}
+
+	if err := runGroup.Start(ctx); err != nil {
+		return fmt.Errorf("start goroutines: %w", err)
+	}
+
+	rt.endpointWait = make(chan struct{})
+	if err := runGroup.Add("register-endpoints", func(ctx context.Context) error {
+		defer close(rt.endpointWait)
+		for _, endpoint := range rt.endpoints {
+			endpoint := endpoint
+			if err := rt.registerEndpoint(ctx, endpoint); err != nil {
+				return fmt.Errorf("register endpoint %s: %w", endpoint, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("add register-endpoints: %w", err)
+	}
 
 	if rt.jwks != nil {
 		// doesn't count as doing anything
-		runGroup.Add("jwks", rt.jwks.Run)
+		if err := runGroup.Add("jwks", rt.jwks.Run); err != nil {
+			return fmt.Errorf("add jwks: %w", err)
+		}
 	}
 
 	for _, outbox := range rt.outboxListeners {
 		didAnything = true
-		runGroup.Add(outbox.Name, outbox.Run)
+		if err := runGroup.Add(outbox.Name, outbox.Run); err != nil {
+			return fmt.Errorf("add outbox %s: %w", outbox.Name, err)
+		}
 	}
+
+	<-rt.endpointWait
 
 	if rt.routerServer != nil {
 		// TODO: Metrics
 		didAnything = true
 
-		runGroup.Add("router", rt.routerServer.Run)
+		if err := runGroup.Add("router", rt.routerServer.Run); err != nil {
+			return fmt.Errorf("add router: %w", err)
+		}
+
 	}
 
 	if rt.queueWorker != nil {
 		didAnything = true
-		runGroup.Add("worker", rt.queueWorker.Run)
-	}
-
-	if rt.adapter != nil {
-		didAnything = true
-		runGroup.Add("adapter", rt.adapter.Run)
-	}
-
-	if rt.postgresProxy != nil {
-		didAnything = true
-		runGroup.Add("postgres-proxy", rt.postgresProxy.Run)
-	}
-
-	if !didAnything {
-		return nil, NothingToDoError
-	}
-	return runGroup, nil
-}
-
-func (rt *Runtime) Run(ctx context.Context) error {
-	log.Debug(ctx, "Sidecar Running")
-	defer rt.Close()
-
-	for _, endpoint := range rt.endpoints {
-		endpoint := endpoint
-		if err := rt.registerEndpoint(ctx, endpoint); err != nil {
-			return fmt.Errorf("register endpoint %s: %w", endpoint, err)
+		if err := runGroup.Add("worker", rt.queueWorker.Run); err != nil {
+			return fmt.Errorf("add worker: %w", err)
 		}
 	}
 
-	runGroup, err := rt.buildRunGroup()
-	if err != nil {
-		return err
+	if !didAnything {
+		return NothingToDoError
 	}
 
-	if err := runGroup.Run(ctx); err != nil {
+	if err := runGroup.Wait(); err != nil {
 		log.WithError(ctx, err).Error("Error in goroutines")
 		return err
 	}
