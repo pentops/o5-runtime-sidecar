@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"net"
 	"time"
 
 	sq "github.com/elgris/sqrl"
@@ -21,36 +20,22 @@ type Batcher interface {
 	PublishBatch(ctx context.Context, messages []*messaging_pb.Message) ([]string, error)
 }
 
+type pgConnector interface {
+	PQDialer(ctx context.Context) (pq.Dialer, string, error)
+}
+
 type Listener struct {
-	dbURL     string
-	dialer    pq.Dialer
+	connector pgConnector
 	source    awsmsg.SourceConfig
 	publisher Batcher
 }
 
-func NewListener(dbURL string, dialer pq.Dialer, publisher Batcher, sourceConfig awsmsg.SourceConfig) (*Listener, error) {
-	_, err := pq.ParseURL(dbURL)
-	if err != nil {
-		// the URL can contain secrets, so we don't want to log it... but it
-		// does make debugging difficult.
-		return nil, fmt.Errorf("parsing postgres URL: %w", err)
-	}
+func NewListener(connector pgConnector, publisher Batcher, sourceConfig awsmsg.SourceConfig) (*Listener, error) {
 	return &Listener{
-		dbURL:     dbURL,
-		dialer:    dialer,
+		connector: connector,
 		source:    sourceConfig,
 		publisher: publisher,
 	}, nil
-}
-
-type NetDialer struct{}
-
-func (NetDialer) Dial(network, address string) (net.Conn, error) {
-	return net.Dial(network, address)
-}
-
-func (NetDialer) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout(network, address, timeout)
 }
 
 func (ll *Listener) Listen(ctx context.Context) error {
@@ -58,7 +43,12 @@ func (ll *Listener) Listen(ctx context.Context) error {
 	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
-	pqListener := pq.NewDialListener(ll.dialer, ll.dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
+	dialer, dbURL, err := ll.connector.PQDialer(ctx)
+	if err != nil {
+		return err
+	}
+
+	pqListener := pq.NewDialListener(dialer, dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
 		if err != nil {
 			log.WithError(ctx, err).Error("error in listener")
 		}
@@ -82,11 +72,11 @@ func (ll *Listener) Listen(ctx context.Context) error {
 		break
 	}
 
-	connector, err := pq.NewConnector(ll.dbURL)
+	connector, err := pq.NewConnector(dbURL)
 	if err != nil {
 		return err
 	}
-	connector.Dialer(ll.dialer)
+	connector.Dialer(dialer)
 
 	db := sql.OpenDB(connector)
 

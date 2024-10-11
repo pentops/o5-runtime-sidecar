@@ -8,29 +8,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/lib/pq"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/pgproxy"
 )
-
-type AuroraIAMEnvVar struct {
-	Endpoint string `json:"endpoint"` // Address and Port
-	DbName   string `json:"dbName"`
-	DbUser   string `json:"dbUser"`
-}
-
-type postgresConn struct {
-	Name   string
-	DSN    string
-	Aurora *AuroraIAMEnvVar
-}
-
-func looksLikePGConnString(name string) bool {
-	// Full URL structure postgres://user:password@host:port/dbname
-	// 'Connection String' - key=value style
-	return strings.HasPrefix(name, "postgres://") || strings.Contains(name, "=")
-}
 
 func looksLikeJSONString(name string) bool {
 	return strings.HasPrefix(name, "{") && strings.HasSuffix(name, "}")
@@ -38,12 +19,58 @@ func looksLikeJSONString(name string) bool {
 
 var reValidDBEnvName = regexp.MustCompile(`^[A-Z0-9_]+$`)
 
-func buildPostgres(raw string) (*postgresConn, error) {
-	if looksLikePGConnString(raw) {
+type pgConnSet struct {
+	awsProvider AWSProvider
+	credBuilder *pgproxy.CredBuilder
+	connectors  map[string]pgproxy.PGConnector
+}
+
+func newPGConnSet(awsProvider AWSProvider) *pgConnSet {
+	return &pgConnSet{
+		awsProvider: awsProvider,
+		connectors:  make(map[string]pgproxy.PGConnector),
+	}
+}
+
+func (ss *pgConnSet) direct(name, raw string) (pgproxy.PGConnector, error) {
+	if conn, ok := ss.connectors[name]; ok {
+		return conn, nil
+	}
+	conn := pgproxy.NewDirectConnector(name, raw)
+	ss.connectors[name] = conn
+	return conn, nil
+}
+
+func (ss *pgConnSet) aurora(name string, config *pgproxy.AuroraConfig) (pgproxy.PGConnector, error) {
+	if conn, ok := ss.connectors[name]; ok {
+		return conn, nil
+	}
+
+	if ss.credBuilder == nil {
+		ss.credBuilder = pgproxy.NewCredBuilder(ss.awsProvider.Credentials(), ss.awsProvider.Region())
+	}
+
+	if err := ss.credBuilder.AddConfig(name, config); err != nil {
+		return nil, fmt.Errorf("adding config for %q: %w", name, err)
+	}
+
+	conn, err := pgproxy.NewAuroraConnector(name, ss.credBuilder)
+	if err != nil {
+		return nil, err
+	}
+	ss.connectors[name] = conn
+	return conn, nil
+}
+
+func (ss *pgConnSet) getConnector(raw string) (pgproxy.PGConnector, error) {
+
+	name, ok, err := pgproxy.TryParsePGString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parsing postgres string: %w", err)
+	}
+	if ok {
 		// Credentials were passed directly in the env, use as-is
-		return &postgresConn{
-			DSN: raw,
-		}, nil
+		return ss.direct(name, raw)
 	}
 
 	if !reValidDBEnvName.MatchString(raw) {
@@ -56,79 +83,38 @@ func buildPostgres(raw string) (*postgresConn, error) {
 		// safe to log since the regex makes it very hard to store a password...
 		return nil, fmt.Errorf("no credentials found - expecting $DB_CREDS_%s", raw)
 	}
-	if looksLikePGConnString(envCreds) {
-		return &postgresConn{
-			Name: raw,
-			DSN:  envCreds,
-		}, nil
+	_, ok, err = pgproxy.TryParsePGString(envCreds)
+	if err != nil {
+		return nil, fmt.Errorf("parsing postgres string from $DB_CREDS_%s: %w", raw, err)
+	}
+	if ok {
+		// use the raw name as the connection name, but the parsed DSN
+		return ss.direct(raw, envCreds)
 	}
 
 	if !looksLikeJSONString(envCreds) {
 		return nil, fmt.Errorf("invalid DB credentials in $DB_CREDS_%s, expecing a DSN or JSON value", raw)
 	}
 
-	arg := AuroraIAMEnvVar{}
-	if err := json.Unmarshal([]byte(envCreds), &arg); err != nil {
+	config := &pgproxy.AuroraConfig{}
+	if err := json.Unmarshal([]byte(envCreds), config); err != nil {
 		return nil, fmt.Errorf("invalid JSON in $DB_CREDS_%s: %w", raw, err)
 	}
 
-	dsn := fmt.Sprintf("postgres://%s@localhost:5432/%s?sslmode=disable",
-		arg.DbUser,
-		arg.DbUser,
-	)
-
-	return &postgresConn{
-		DSN:    dsn,
-		Name:   raw,
-		Aurora: &arg,
-	}, nil
-}
-
-func buildPostgresConn(endpoint *AuroraIAMEnvVar, awsProvider AWSProvider) (pgproxy.AuthClient, error) {
-	region := awsProvider.Region()
-	creds := awsProvider.Credentials()
-
-	builder, err := pgproxy.NewCredBuilder(creds, endpoint.Endpoint, region)
-	if err != nil {
-		return nil, err
-	}
-
-	return builder, nil
+	return ss.aurora(raw, config)
 }
 
 type postgresProxy struct {
-	conn     *pgproxy.Connector
 	listener *pgproxy.Listener
 }
 
-func newPostgresProxy(awsProvider AWSProvider, bind string, conns []*postgresConn) (*postgresProxy, error) {
-
-	builders := pgproxy.CredMap{}
-
-	for _, conn := range conns {
-		if conn.Aurora == nil {
-			return nil, fmt.Errorf("no aurora config for %q", conn.Name)
-		}
-
-		builder, err := buildPostgresConn(conn.Aurora, awsProvider)
-		if err != nil {
-			return nil, fmt.Errorf("building postgres connection: %w", err)
-		}
-		builders[conn.Name] = builder
-	}
-
-	connector, err := pgproxy.NewConnector(builders)
-	if err != nil {
-		return nil, err
-	}
-
-	listener, err := pgproxy.NewListener(connector, bind)
+func newPostgresProxy(bind string, conns map[string]pgproxy.PGConnector) (*postgresProxy, error) {
+	listener, err := pgproxy.NewListener(bind, conns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
 
 	return &postgresProxy{
-		conn:     connector,
 		listener: listener,
 	}, nil
 }
@@ -142,32 +128,15 @@ type outboxListener struct {
 	*outbox.Listener
 }
 
-func newOutboxListener(conn *postgresConn, batcher outbox.Batcher, source awsmsg.SourceConfig, awsProvider AWSProvider) (*outboxListener, error) {
-
-	var dialer pq.Dialer
-
-	if conn.Aurora == nil {
-		dialer = outbox.NetDialer{}
-	} else {
-		builder, err := buildPostgresConn(conn.Aurora, awsProvider)
-		if err != nil {
-			return nil, fmt.Errorf("building postgres connection: %w", err)
-		}
-		connector, err := pgproxy.NewConnector(builder)
-		if err != nil {
-			return nil, err
-		}
-
-		dialer = connector
-	}
-
-	ll, err := outbox.NewListener(conn.DSN, dialer, batcher, source)
+func newOutboxListener(conn pgproxy.PGConnector, batcher outbox.Batcher, source awsmsg.SourceConfig) (*outboxListener, error) {
+	name := conn.Name()
+	ll, err := outbox.NewListener(conn, batcher, source)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create outbox listener: %w", err)
 	}
 
 	return &outboxListener{
-		Name:     fmt.Sprintf("outbox-%s", conn.Name),
+		Name:     fmt.Sprintf("outbox-%s", name),
 		Listener: ll,
 	}, nil
 }

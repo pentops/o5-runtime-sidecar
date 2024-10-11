@@ -3,10 +3,10 @@ package entrypoint
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
+	"github.com/pentops/o5-runtime-sidecar/pgproxy"
 	"github.com/pentops/o5-runtime-sidecar/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sqslink"
 	"github.com/rs/cors"
@@ -63,21 +63,19 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		rt.sender = awsmsg.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeARN)
 	}
 
+	pgConfigs := newPGConnSet(awsConfig)
 	if len(envConfig.PostgresOutboxURI) > 0 {
 		if rt.sender == nil {
 			return nil, fmt.Errorf("outbox requires a sender (set EVENTBRIDGE_ARN)")
 		}
 
-		for idx, rawVar := range envConfig.PostgresOutboxURI {
-			conn, err := buildPostgres(rawVar)
+		for _, rawVar := range envConfig.PostgresOutboxURI {
+			conn, err := pgConfigs.getConnector(rawVar)
 			if err != nil {
 				return nil, fmt.Errorf("building postgres connection: %w", err)
 			}
-			if conn.Name == "" {
-				conn.Name = strconv.Itoa(idx)
-			}
 
-			listener, err := newOutboxListener(conn, rt.sender, srcConfig, awsConfig)
+			listener, err := newOutboxListener(conn, rt.sender, srcConfig)
 			if err != nil {
 				return nil, fmt.Errorf("creating outbox listener: %w", err)
 			}
@@ -86,29 +84,21 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	}
 
 	if len(envConfig.PostgresProxy) > 0 {
-		auroraDBs := []*postgresConn{}
-		for idx, rawVar := range envConfig.PostgresProxy {
-			conn, err := buildPostgres(rawVar)
+		connectors := map[string]pgproxy.PGConnector{}
+		for _, rawVar := range envConfig.PostgresProxy {
+			conn, err := pgConfigs.getConnector(rawVar)
 			if err != nil {
 				return nil, fmt.Errorf("building postgres connection: %w", err)
 			}
-			if conn.Name == "" {
-				conn.Name = strconv.Itoa(idx)
-			}
-
-			if conn.Aurora == nil {
-				return nil, fmt.Errorf("no aurora config for %q", conn.Name)
-			}
-			auroraDBs = append(auroraDBs, conn)
+			connectors[conn.Name()] = conn
 		}
 
-		proxy, err := newPostgresProxy(awsConfig, envConfig.PostgresProxyBind, auroraDBs)
+		proxy, err := newPostgresProxy(envConfig.PostgresProxyBind, connectors)
 		if err != nil {
 			return nil, fmt.Errorf("creating postgres proxy: %w", err)
 		}
 
 		rt.postgresProxy = proxy
-
 	}
 
 	if envConfig.SQSURL != "" {

@@ -23,26 +23,35 @@ func main() {
 }
 
 func runPgProxy(ctx context.Context, args struct {
-	Endpoint string `env:"PGPROXY_RDS_ENDPOINT"`
-	Port     int    `env:"PGPROXY_PORT" default:"5432"`
+	Endpoint   string `env:"PGPROXY_RDS_ENDPOINT"`
+	ListenPort int    `env:"PGPROXY_PORT" default:"5432"`
+	Name       string `flag:"name"`
+	User       string `flag:"user"`
 }) error {
 
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("configuration error: %w", err)
-	}
 
-	builder, err := pgproxy.NewCredBuilder(cfg.Credentials, args.Endpoint, cfg.Region)
+	}
+	builder := pgproxy.NewCredBuilder(cfg.Credentials, cfg.Region)
+	err = builder.AddConfig("default", &pgproxy.AuroraConfig{
+		Endpoint: args.Endpoint,
+		DbName:   args.Name,
+		DbUser:   args.User,
+	})
 	if err != nil {
 		return err
 	}
 
-	connector, err := pgproxy.NewConnector(builder)
+	connector, err := pgproxy.NewAuroraConnector("default", builder)
 	if err != nil {
 		return err
 	}
 
-	listener, err := pgproxy.NewListener(connector, fmt.Sprintf(":%d", args.Port))
+	listener, err := pgproxy.NewListener(fmt.Sprintf(":%d", args.ListenPort), map[string]pgproxy.PGConnector{
+		"default": connector,
+	})
 	if err != nil {
 		return err
 	}
@@ -61,12 +70,17 @@ func runPgUrl(ctx context.Context, args struct {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
-	builder, err := pgproxy.NewCredBuilder(cfg.Credentials, args.Endpoint, cfg.Region)
+	builder := pgproxy.NewCredBuilder(cfg.Credentials, cfg.Region)
+	err = builder.AddConfig("default", &pgproxy.AuroraConfig{
+		Endpoint: args.Endpoint,
+		DbName:   args.Name,
+		DbUser:   args.User,
+	})
 	if err != nil {
 		return err
 	}
 
-	url, err := builder.NewConnectionString(ctx, args.Name, args.User)
+	url, err := builder.NewToken(ctx, "default")
 	if err != nil {
 		return err
 	}
@@ -86,12 +100,17 @@ func runPgToken(ctx context.Context, args struct {
 		return fmt.Errorf("configuration error: %w", err)
 	}
 
-	builder, err := pgproxy.NewCredBuilder(cfg.Credentials, args.Endpoint, cfg.Region)
+	builder := pgproxy.NewCredBuilder(cfg.Credentials, cfg.Region)
+	err = builder.AddConfig("default", &pgproxy.AuroraConfig{
+		Endpoint: args.Endpoint,
+		DbName:   args.Name,
+		DbUser:   args.User,
+	})
 	if err != nil {
 		return err
 	}
 
-	url, err := builder.NewToken(ctx, args.User)
+	url, err := builder.NewToken(ctx, "default")
 	if err != nil {
 		return err
 	}

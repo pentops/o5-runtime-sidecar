@@ -1,0 +1,143 @@
+package pgproxy
+
+import (
+	"context"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/lib/pq"
+)
+
+type AuroraConfig struct {
+	Endpoint string `json:"endpoint"` // Address and Port
+	Port     int    `json:"port"`
+	DbName   string `json:"dbName"`
+	DbUser   string `json:"dbUser"`
+}
+
+type auroraConnector struct {
+	creds AuthClient
+	name  string
+}
+
+func NewAuroraConnector(name string, creds AuthClient) (PGConnector, error) {
+	return &auroraConnector{
+		creds: creds,
+		name:  name,
+	}, nil
+}
+
+func (ac *auroraConnector) PQDialer(ctx context.Context) (pq.Dialer, string, error) {
+	pipe, err := NewPipe(ctx, ac)
+	if err != nil {
+		return nil, "", fmt.Errorf("creating pipe: %w", err)
+	}
+	return pipe, fmt.Sprintf("dbname=%s sslmode=disable", ac.name), nil
+}
+
+func (ac *auroraConnector) ConnectToServer(ctx context.Context) (*Frontend, error) {
+	endpoint, err := ac.creds.ConnectionString(ctx, ac.name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection string: %w", err)
+	}
+	return dialPGX(ctx, endpoint)
+}
+
+func (ac *auroraConnector) Name() string {
+	return ac.name
+}
+
+type CredBuilder struct {
+	creds   aws.CredentialsProvider
+	configs map[string]*AuroraConfig
+	region  string
+}
+
+func NewCredBuilder(creds aws.CredentialsProvider, region string) *CredBuilder {
+	cb := &CredBuilder{
+		creds:   creds,
+		region:  region,
+		configs: make(map[string]*AuroraConfig),
+	}
+	return cb
+}
+
+func fixConfig(config *AuroraConfig) error {
+	parts := strings.Split(config.Endpoint, ":")
+	if len(parts) == 1 {
+		if config.Port == 0 {
+			config.Port = 5432
+		}
+	} else if len(parts) == 2 {
+		endpoint, portStr := parts[0], parts[1]
+		portInt, err := strconv.Atoi(portStr)
+		if err != nil {
+			return fmt.Errorf("invalid endpoint %s: %w", config.Endpoint, err)
+		}
+		if config.Port == 0 {
+			config.Port = portInt
+		} else if config.Port != portInt {
+			return fmt.Errorf("port in endpoint doesn't match specified port")
+		}
+		config.Endpoint = endpoint
+	} else {
+		return fmt.Errorf("invalid endpoint %s", config.Endpoint)
+	}
+
+	return nil
+}
+
+func (cb *CredBuilder) AddConfig(name string, config *AuroraConfig) error {
+	if _, ok := cb.configs[name]; ok {
+		return fmt.Errorf("config %q already exists", name)
+	}
+
+	if err := fixConfig(config); err != nil {
+		return err
+	}
+	cb.configs[name] = config
+	return nil
+}
+
+func (cb *CredBuilder) NewToken(ctx context.Context, lookupName string) (string, error) {
+	config, ok := cb.configs[lookupName]
+	if !ok {
+		return "", fmt.Errorf("no config found for %q", lookupName)
+	}
+
+	return cb.newToken(ctx, config)
+}
+
+func (cb *CredBuilder) newToken(ctx context.Context, config *AuroraConfig) (string, error) {
+	authenticationToken, err := auth.BuildAuthToken(
+		ctx, fmt.Sprintf("%s:%d", config.Endpoint, config.Port), cb.region, config.DbUser, cb.creds)
+	if err != nil {
+		return "", fmt.Errorf("failed to create authentication token: %w", err)
+	}
+	return authenticationToken, nil
+}
+
+func (cb *CredBuilder) ConnectionString(ctx context.Context, lookupName string) (string, error) {
+	config, ok := cb.configs[lookupName]
+	if !ok {
+		return "", fmt.Errorf("no config found for %q", lookupName)
+	}
+
+	// TODO: Cache the token.
+
+	token, err := cb.newToken(ctx, config)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s",
+		config.DbUser,
+		token,
+		config.Endpoint,
+		config.Port,
+		config.DbName,
+	), nil
+}
