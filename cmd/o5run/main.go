@@ -49,7 +49,7 @@ func runPgProxy(ctx context.Context, args struct {
 		return err
 	}
 
-	listener, err := pgproxy.NewListener(fmt.Sprintf(":%d", args.ListenPort), map[string]pgproxy.PGConnector{
+	listener, err := pgproxy.NewListener("tcp", fmt.Sprintf(":%d", args.ListenPort), map[string]pgproxy.PGConnector{
 		"default": connector,
 	})
 	if err != nil {

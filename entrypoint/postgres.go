@@ -109,7 +109,7 @@ type postgresProxy struct {
 }
 
 func newPostgresProxy(bind string, conns map[string]pgproxy.PGConnector) (*postgresProxy, error) {
-	listener, err := pgproxy.NewListener(bind, conns)
+	listener, err := pgproxy.NewListener("unix", bind, conns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}

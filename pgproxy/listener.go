@@ -11,11 +11,12 @@ import (
 )
 
 type Listener struct {
-	dbs  map[string]PGConnector
-	bind string
+	dbs     map[string]PGConnector
+	bind    string
+	network string
 }
 
-func NewListener(bind string, dbs map[string]PGConnector) (*Listener, error) {
+func NewListener(network, bind string, dbs map[string]PGConnector) (*Listener, error) {
 	return &Listener{
 		dbs:  dbs,
 		bind: bind,
@@ -23,7 +24,7 @@ func NewListener(bind string, dbs map[string]PGConnector) (*Listener, error) {
 }
 
 func (l *Listener) Listen(ctx context.Context) error {
-	ln, err := net.Listen("tcp", l.bind)
+	ln, err := net.Listen(l.network, l.bind)
 	if err != nil {
 		return err
 	}
