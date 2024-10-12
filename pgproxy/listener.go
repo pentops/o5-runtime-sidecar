@@ -18,8 +18,9 @@ type Listener struct {
 
 func NewListener(network, bind string, dbs map[string]PGConnector) (*Listener, error) {
 	return &Listener{
-		dbs:  dbs,
-		bind: bind,
+		dbs:     dbs,
+		network: network,
+		bind:    bind,
 	}, nil
 }
 
