@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"path/filepath"
 
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/pentops/log.go/log"
@@ -17,6 +19,15 @@ type Listener struct {
 }
 
 func NewListener(network, bind string, dbs map[string]PGConnector) (*Listener, error) {
+
+	if network == "unix" {
+		if err := os.MkdirAll(filepath.Dir(bind), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create directory for unix socket: %w", err)
+		}
+		if err := os.Remove(bind); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove existing unix socket: %w", err)
+		}
+	}
 	return &Listener{
 		dbs:     dbs,
 		network: network,
@@ -25,7 +36,8 @@ func NewListener(network, bind string, dbs map[string]PGConnector) (*Listener, e
 }
 
 func (l *Listener) Listen(ctx context.Context) error {
-	ln, err := net.Listen(l.network, l.bind)
+	lc := net.ListenConfig{}
+	ln, err := lc.Listen(ctx, l.network, l.bind)
 	if err != nil {
 		return err
 	}
@@ -36,10 +48,13 @@ func (l *Listener) Listen(ctx context.Context) error {
 		<-ctx.Done()
 		ln.Close()
 	}()
-
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if ctx.Err() != nil {
+				log.WithError(ctx, err).Info("pgproxy: listener closed")
+				return nil
+			}
 			return err
 		}
 		go l.newConn(ctx, conn)

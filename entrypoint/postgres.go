@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -117,12 +116,6 @@ func newPostgresProxy(bind string, conns map[string]pgproxy.PGConnector) (*postg
 	var net string
 	if strings.HasPrefix(bind, "/") {
 		net = "unix"
-		if err := os.MkdirAll(filepath.Dir(bind), 0755); err != nil {
-			return nil, fmt.Errorf("failed to create directory for unix socket: %w", err)
-		}
-		if err := os.Remove(bind); err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to remove existing unix socket: %w", err)
-		}
 	} else {
 		net = "tcp"
 	}

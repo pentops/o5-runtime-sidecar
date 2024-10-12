@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/pgproxy"
 	"github.com/pentops/runner/commander"
 )
@@ -23,10 +25,10 @@ func main() {
 }
 
 func runPgProxy(ctx context.Context, args struct {
-	Endpoint   string `env:"PGPROXY_RDS_ENDPOINT"`
-	ListenPort int    `env:"PGPROXY_PORT" default:"5432"`
-	Name       string `flag:"name"`
-	User       string `flag:"user"`
+	Endpoint string `env:"PGPROXY_RDS_ENDPOINT"`
+	Bind     string `env:"PGPROXY_BIND" default:":5432"`
+	Name     string `flag:"name"`
+	User     string `flag:"user"`
 }) error {
 
 	cfg, err := config.LoadDefaultConfig(ctx)
@@ -49,14 +51,25 @@ func runPgProxy(ctx context.Context, args struct {
 		return err
 	}
 
-	listener, err := pgproxy.NewListener("tcp", fmt.Sprintf(":%d", args.ListenPort), map[string]pgproxy.PGConnector{
+	network := "tcp"
+	if strings.HasPrefix(args.Bind, "/") {
+		network = "unix"
+
+	}
+	listener, err := pgproxy.NewListener(network, args.Bind, map[string]pgproxy.PGConnector{
 		"default": connector,
 	})
 	if err != nil {
 		return err
 	}
 
-	return listener.Listen(ctx)
+	err = listener.Listen(ctx)
+	if err != nil {
+		log.WithError(ctx, err).Error("pgproxy: listener error")
+		return err
+	}
+	log.WithField(ctx, "bind", args.Bind).Info("pgproxy: Exit")
+	return nil
 }
 
 func runPgUrl(ctx context.Context, args struct {

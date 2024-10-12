@@ -12,10 +12,11 @@ require (
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
+	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d
-	github.com/pentops/flowtest v0.0.0-20240917192406-c387da443c68
+	github.com/pentops/flowtest v0.0.0-20241005200401-85365de288f3
 	github.com/pentops/j5 v0.0.0-20241001000547-80229b8bcdcc
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
 	github.com/pentops/log.go v0.0.0-20240930194039-e8e09c525e33
@@ -48,7 +49,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.17.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
-	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
