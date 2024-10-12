@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 
+	"github.com/iancoleman/strcase"
 	"github.com/pentops/o5-runtime-sidecar/awsmsg"
 	"github.com/pentops/o5-runtime-sidecar/outbox"
 	"github.com/pentops/o5-runtime-sidecar/pgproxy"
@@ -77,31 +79,33 @@ func (ss *pgConnSet) getConnector(raw string) (pgproxy.PGConnector, error) {
 		return nil, fmt.Errorf("invalid DB ref/name: %q", raw)
 	}
 
+	envVarName := "DB_CREDS_" + strcase.ToScreamingSnake(raw)
+	dbName := strcase.ToSnake(raw)
 	// the Name passed in should be just the DB name with matching env var
-	envCreds := os.Getenv("DB_CREDS_" + raw)
+	envCreds := os.Getenv(envVarName)
 	if envCreds == "" {
 		// safe to log since the regex makes it very hard to store a password...
-		return nil, fmt.Errorf("no credentials found - expecting $DB_CREDS_%s", raw)
+		return nil, fmt.Errorf("no credentials found - expecting $%s", envVarName)
 	}
 	_, ok, err = pgproxy.TryParsePGString(envCreds)
 	if err != nil {
-		return nil, fmt.Errorf("parsing postgres string from $DB_CREDS_%s: %w", raw, err)
+		return nil, fmt.Errorf("parsing postgres string from $%s: %w", envVarName, err)
 	}
 	if ok {
 		// use the raw name as the connection name, but the parsed DSN
-		return ss.direct(raw, envCreds)
+		return ss.direct(dbName, envCreds)
 	}
 
 	if !looksLikeJSONString(envCreds) {
-		return nil, fmt.Errorf("invalid DB credentials in $DB_CREDS_%s, expecing a DSN or JSON value", raw)
+		return nil, fmt.Errorf("invalid DB credentials in $%s, expecing a DSN or JSON value", envVarName)
 	}
 
 	config := &pgproxy.AuroraConfig{}
 	if err := json.Unmarshal([]byte(envCreds), config); err != nil {
-		return nil, fmt.Errorf("invalid JSON in $DB_CREDS_%s: %w", raw, err)
+		return nil, fmt.Errorf("invalid JSON in $%s: %w", envVarName, err)
 	}
 
-	return ss.aurora(raw, config)
+	return ss.aurora(dbName, config)
 }
 
 type postgresProxy struct {
@@ -109,7 +113,21 @@ type postgresProxy struct {
 }
 
 func newPostgresProxy(bind string, conns map[string]pgproxy.PGConnector) (*postgresProxy, error) {
-	listener, err := pgproxy.NewListener("unix", bind, conns)
+
+	var net string
+	if strings.HasPrefix(bind, "/") {
+		net = "unix"
+		if err := os.MkdirAll(filepath.Dir(bind), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create directory for unix socket: %w", err)
+		}
+		if err := os.Remove(bind); err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to remove existing unix socket: %w", err)
+		}
+	} else {
+		net = "tcp"
+	}
+
+	listener, err := pgproxy.NewListener(net, bind, conns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}

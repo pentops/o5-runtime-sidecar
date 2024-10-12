@@ -58,7 +58,7 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 
 	serverConfig, ok := ln.dbs[client.Data.Database]
 	if !ok {
-		client.Fatalf(ctx, "database %s not found")
+		client.Fatalf(ctx, "database %s not found", client.Data.Database)
 		return
 	}
 
