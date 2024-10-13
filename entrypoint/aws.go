@@ -9,6 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/sns"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/pentops/log.go/log"
 )
 
 type AWSConfigBuilder struct {
@@ -44,6 +46,19 @@ func NewDefaultAWSConfigBuilder(ctx context.Context) (*AWSConfigBuilder, error) 
 	if err != nil {
 		return nil, fmt.Errorf("couldn't load aws config: %w", err)
 	}
+
+	stsClient := sts.NewFromConfig(cfg)
+	callerIdentity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, err
+	}
+
+	log.WithFields(ctx, map[string]interface{}{
+		"account": aws.ToString(callerIdentity.Account),
+		"arn":     aws.ToString(callerIdentity.Arn),
+		"user":    aws.ToString(callerIdentity.UserId),
+	}).Info("Sidecar AWS Identity")
+
 	return NewAWSConfigBuilder(cfg), nil
 }
 

@@ -7,11 +7,13 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/awsmsg"
-	"github.com/pentops/o5-runtime-sidecar/protoread"
-	"github.com/pentops/o5-runtime-sidecar/sqslink"
+	"github.com/pentops/o5-runtime-sidecar/adapters/grpc_reflect"
+	"github.com/pentops/o5-runtime-sidecar/apps/bridge"
+	"github.com/pentops/o5-runtime-sidecar/apps/httpserver"
+	"github.com/pentops/o5-runtime-sidecar/apps/postgres/pgoutbox"
+	"github.com/pentops/o5-runtime-sidecar/apps/postgres/pgproxy"
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker"
 	"github.com/pentops/runner"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -20,13 +22,13 @@ import (
 var NothingToDoError = errors.New("no services configured")
 
 type Runtime struct {
-	queueWorker     *sqslink.Worker
-	sender          awsmsg.Publisher
-	jwks            *jwks.JWKSManager
-	adapter         *adapterServer
-	routerServer    *routerServer
-	outboxListeners []*outboxListener
-	postgresProxy   *postgresProxy
+	sender Publisher
+
+	queueWorker     *queueworker.App
+	adapter         *bridge.App
+	routerServer    *httpserver.Router
+	outboxListeners []*pgoutbox.App
+	postgresProxy   *pgproxy.App
 
 	connections  []io.Closer
 	endpoints    []string
@@ -82,11 +84,6 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		return nil
 	})
 
-	if rt.jwks != nil {
-		// doesn't count as doing anything
-		runGroup.Add("jwks", rt.jwks.Run)
-	}
-
 	for _, outbox := range rt.outboxListeners {
 		didAnything = true
 		runGroup.Add(outbox.Name, outbox.Run)
@@ -128,7 +125,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error 
 	}
 	rt.connections = append(rt.connections, conn)
 
-	prClient := protoread.NewClient(conn)
+	prClient := grpc_reflect.NewClient(conn)
 
 	services, err := prClient.FetchServices(ctx, conn)
 	if err != nil {

@@ -1,0 +1,48 @@
+package queueworker
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/sqslink"
+	"github.com/pentops/o5-runtime-sidecar/sidecar"
+	"google.golang.org/protobuf/reflect/protoreflect"
+)
+
+type WorkerConfig struct {
+	SQSURL        string `env:"SQS_URL" default:""`
+	ResendChance  int    `env:"RESEND_CHANCE" required:"false"`
+	NoDeadLetters bool   `env:"NO_DEADLETTERS" default:"false"`
+}
+
+type App struct {
+	queueWorker *sqslink.Worker
+}
+
+type Publisher interface {
+	sqslink.Publisher
+}
+
+func NewApp(config WorkerConfig, info sidecar.AppInfo, publisher sqslink.Publisher, sqs sqslink.SQSAPI) (*App, error) {
+	var dlh sqslink.DeadLetterHandler
+	if !config.NoDeadLetters {
+		if publisher == nil {
+			return nil, fmt.Errorf("outbox requires a sender (set EVENTBRIDGE_ARN)")
+		}
+
+		dlh = sqslink.NewO5MessageDeadLetterHandler(publisher, info)
+	}
+	ww := sqslink.NewWorker(sqs, config.SQSURL, dlh, config.ResendChance)
+	return &App{
+		queueWorker: ww,
+	}, nil
+
+}
+
+func (app *App) Run(ctx context.Context) error {
+	return app.queueWorker.Run(ctx)
+}
+
+func (app *App) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker sqslink.Invoker) error {
+	return app.queueWorker.RegisterService(ctx, service, invoker)
+}
