@@ -17,6 +17,8 @@ services:
     image: golang:1.22
     volumes:
       - ".:/src"
+    links:
+      - database
     working_dir: "/src"
     command: "go test ./..."
     environment:
