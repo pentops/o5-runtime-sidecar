@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
-	"github.com/lib/pq"
 )
 
 type AuroraConfig struct {
@@ -30,6 +29,7 @@ func NewAuroraConnector(name string, creds AuthClient) (PGConnector, error) {
 	}, nil
 }
 
+/*
 func (ac *auroraConnector) PQDialer(ctx context.Context) (pq.Dialer, string, error) {
 	pipe, err := NewPipe(ctx, ac)
 	if err != nil {
@@ -43,11 +43,24 @@ func (ac *auroraConnector) ConnectToServer(ctx context.Context) (*Frontend, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to create connection string: %w", err)
 	}
-	return dialPGX(ctx, endpoint)
+	return dialFrontend(ctx, endpoint)
 }
+
+func (ac *auroraConnector) ConnectPGX(ctx context.Context) (*pgx.Conn, error) {
+	endpoint, err := ac.creds.ConnectionString(ctx, ac.name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create connection string: %w", err)
+	}
+	return pgx.Connect(ctx, endpoint)
+}
+*/
 
 func (ac *auroraConnector) Name() string {
 	return ac.name
+}
+
+func (ac *auroraConnector) DSN(ctx context.Context) (string, error) {
+	return ac.creds.ConnectionString(ctx, ac.name)
 }
 
 type CredBuilder struct {

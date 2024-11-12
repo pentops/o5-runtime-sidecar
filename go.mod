@@ -9,7 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/eventbridge v1.33.3
 	github.com/aws/aws-sdk-go-v2/service/sns v1.31.3
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.34.3
-	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
+	github.com/aws/aws-sdk-go-v2/service/sts v1.30.3
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/iancoleman/strcase v0.3.0
@@ -22,7 +22,7 @@ require (
 	github.com/pentops/log.go v0.0.0-20240930194039-e8e09c525e33
 	github.com/pentops/o5-messaging v0.0.0-20240925203152-81b197123419
 	github.com/pentops/runner v0.0.0-20241010184552-1a959b902d93
-	github.com/pentops/sqrlx.go v0.0.0-20240806064322-33adc0ac5bd4
+	github.com/pressly/goose v2.7.0+incompatible
 	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.8.0
@@ -44,7 +44,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.11.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.22.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.26.4 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.30.3 // indirect
 	github.com/aws/smithy-go v1.21.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.17.0 // indirect
@@ -53,6 +52,7 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect

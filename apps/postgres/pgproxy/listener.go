@@ -3,10 +3,13 @@ package pgproxy
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/adapters/postgres"
 	"github.com/pentops/o5-runtime-sidecar/adapters/postgres/pgserver"
@@ -19,7 +22,6 @@ type Listener struct {
 }
 
 func NewListener(network, bind string, dbs map[string]postgres.PGConnector) (*Listener, error) {
-
 	if network == "unix" {
 		if err := os.MkdirAll(filepath.Dir(bind), 0755); err != nil {
 			return nil, fmt.Errorf("failed to create directory for unix socket: %w", err)
@@ -28,6 +30,7 @@ func NewListener(network, bind string, dbs map[string]postgres.PGConnector) (*Li
 			return nil, fmt.Errorf("failed to remove existing unix socket: %w", err)
 		}
 	}
+
 	return &Listener{
 		dbs:     dbs,
 		network: network,
@@ -77,7 +80,14 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 		return
 	}
 
-	server, err := serverConfig.ConnectToServer(ctx)
+	dsn, err := serverConfig.DSN(ctx)
+	if err != nil {
+		client.Fatal(ctx, "failed to get DSN")
+		log.WithError(ctx, err).Error("pg proxy: error getting DSN")
+		return
+	}
+
+	server, err := dialFrontend(ctx, dsn)
 	if err != nil {
 		client.Fatal(ctx, "failed to connect to server")
 		log.WithError(ctx, err).Error("pg proxy: error connecting to server")
@@ -97,4 +107,59 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 		log.WithError(ctx, err).Error("pgproxy: error in passthrough")
 	}
 
+}
+
+const TxStatusIdle = 'I'
+
+type Frontend struct {
+	frontend *pgproto3.Frontend
+	conn     io.Closer
+}
+
+func (f *Frontend) Close() {
+	f.conn.Close()
+}
+
+func (f *Frontend) Frontend() *pgproto3.Frontend {
+	return f.frontend
+}
+
+func dialFrontend(ctx context.Context, endpoint string) (*Frontend, error) {
+	// Use PGX to connect and log in
+	cfg, err := pgconn.ParseConfig(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("parsing backend config: %w", err)
+	}
+	ctx = log.WithField(ctx, "host", cfg.Host)
+
+	log.Debug(ctx, "connecting to server")
+
+	conn, err := pgconn.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to %s: %w", cfg.Host, err)
+	}
+
+	log.Debug(ctx, "connected to server")
+
+	// Exit the PGX wrapper, we only needed it for auth.
+
+	err = conn.SyncConn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("syncing connection: %w", err)
+	}
+
+	hj, err := conn.Hijack()
+	if err != nil {
+		return nil, fmt.Errorf("hijacking connection: %w", err)
+	}
+
+	if hj.TxStatus != TxStatusIdle {
+		return nil, fmt.Errorf("expected tx status 'I' (idle), got %c", hj.TxStatus)
+	}
+
+	log.Debug(ctx, "hijacked connection")
+	return &Frontend{
+		conn:     hj.Conn,
+		frontend: hj.Frontend,
+	}, nil
 }

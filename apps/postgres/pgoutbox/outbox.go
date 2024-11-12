@@ -2,15 +2,12 @@ package pgoutbox
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
-	sq "github.com/elgris/sqrl"
-	"github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
-	"github.com/pentops/sqrlx.go/sqrlx"
 	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
@@ -21,7 +18,7 @@ type Batcher interface {
 }
 
 type pgConnector interface {
-	PQDialer(ctx context.Context) (pq.Dialer, string, error)
+	DSN(ctx context.Context) (string, error)
 }
 
 type Listener struct {
@@ -38,32 +35,20 @@ func NewListener(connector pgConnector, publisher Batcher, sourceConfig sidecar.
 	}, nil
 }
 
-func (ll *Listener) Listen(ctx context.Context) error {
-
+func (ll *Listener) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
 	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
-	dialer, dbURL, err := ll.connector.PQDialer(ctx)
+	dsn, err := ll.connector.DSN(dialContext)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("getting connection DSN: %w", err)
 	}
-
-	pqListener := pq.NewDialListener(dialer, dbURL, time.Second*1, time.Second*10, func(le pq.ListenerEventType, err error) {
-		log.WithField(ctx, "event", le).Info("listener event")
-		if err != nil {
-			log.WithError(ctx, err).Error("error in listener")
-		}
-	})
-	var closed error
-	go func() {
-		<-dialContext.Done()
-		closed = dialContext.Err()
-	}()
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to PG: %w", err)
+	}
 	for {
-		if closed != nil {
-			return closed
-		}
-		if err := pqListener.Ping(); err != nil {
+		if err := conn.Ping(ctx); err != nil {
 			log.WithError(ctx, err).Warn("pinging Listener PG")
 			time.Sleep(time.Second)
 			continue
@@ -72,42 +57,45 @@ func (ll *Listener) Listen(ctx context.Context) error {
 		break
 	}
 
-	connector, err := pq.NewConnector(dbURL)
+	if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (ll *Listener) Listen(ctx context.Context) error {
+
+	conn, err := ll.connectAndListen(ctx)
 	if err != nil {
 		return err
 	}
-	connector.Dialer(dialer)
 
-	db := sql.OpenDB(connector)
-
-	dbWrapped, err := sqrlx.New(db, sq.Dollar)
-	if err != nil {
+	if err := ll.loopUntilEmpty(ctx, conn, ll.rowsCallback); err != nil {
 		return err
 	}
 
-	runner := looper{
-		db:       dbWrapped,
-		listener: pqListener,
-	}
+	for {
+		log.Debug(ctx, "waiting for notification")
+		_, err := conn.WaitForNotification(ctx)
+		if err != nil {
+			log.WithError(ctx, err).Warn("listener error, reconnecting")
+			conn.Close(ctx)
+			newConn, err := ll.connectAndListen(ctx)
+			if err != nil {
+				return err
+			}
+			conn = newConn
+			log.Info(ctx, "reconnected to PG")
+		} else {
+			log.Debug(ctx, "received notification")
+		}
 
-	if err := pqListener.Listen("outboxmessage"); err != nil {
-		return err
-	}
-
-	if err := runner.loopUntilEmpty(ctx, ll.rowsCallback); err != nil {
-		return err
-	}
-
-	for range pqListener.NotificationChannel() {
-		err := runner.loopUntilEmpty(ctx, ll.rowsCallback)
+		err = ll.loopUntilEmpty(ctx, conn, ll.rowsCallback)
 		if err != nil {
 			return err
 		}
 	}
 
-	log.WithField(ctx, "source", ll.source).Info("Listener stopped")
-
-	return nil
 }
 
 func (ll *Listener) rowsCallback(ctx context.Context, rows []outboxRow) ([]string, error) {
@@ -142,19 +130,19 @@ func parseOutboxMessage(row outboxRow, source sidecar.AppInfo) (*messaging_pb.Me
 	return msg, nil
 }
 
-type looper struct {
-	listener *pq.Listener
-	db       *sqrlx.Wrapper
-}
-
 type pageCallback func(ctx context.Context, rows []outboxRow) ([]string, error)
 
-func (ll looper) loopUntilEmpty(ctx context.Context, callback pageCallback) error {
+func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn, callback pageCallback) error {
+	log.Debug(ctx, "loopUntilEmpty")
 	for {
-		count, err := ll.doPage(ctx, callback)
+		log.Debug(ctx, "doPage")
+		count, err := ll.doPage(ctx, conn, callback)
 		if err != nil {
+			log.WithError(ctx, err).Error("Error running message page")
 			return fmt.Errorf("error doing page of messages: %w", err)
 		}
+		log.WithField(ctx, "count", count).Debug("didPage")
+
 		if count == 0 {
 			return nil
 		}
@@ -166,23 +154,21 @@ type outboxRow struct {
 	message []byte
 }
 
-func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error) {
-	qq := sq.Select(
-		"id",
-		"data",
-	).From("outbox").
-		Limit(10).
-		Suffix("FOR UPDATE SKIP LOCKED")
+func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCallback) (int, error) {
 
 	var count int
 
-	err := ll.db.Transact(ctx, &sqrlx.TxOptions{
-		Isolation: sql.LevelDefault,
-		Retryable: true,
-		ReadOnly:  false,
-	}, func(ctx context.Context, tx sqrlx.Transaction) error {
+	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
+		IsoLevel: pgx.ReadCommitted,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("error beginning transaction: %w", err)
+	}
+
+	var sendError error
+	err = func() error {
 		count = 0
-		rows, err := tx.Select(ctx, qq)
+		rows, err := tx.Query(ctx, "SELECT id, data FROM outbox LIMIT 10 FOR UPDATE SKIP LOCKED")
 		if err != nil {
 			return fmt.Errorf("error selecting outbox messages: %w", err)
 		}
@@ -206,6 +192,7 @@ func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error)
 			msgRows = append(msgRows, row)
 
 		}
+		log.WithField(ctx, "count", count).Debug("got outbox messages")
 
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("error in outbox rows: %w", err)
@@ -215,30 +202,38 @@ func (ll looper) doPage(ctx context.Context, callback pageCallback) (int, error)
 			return nil
 		}
 
-		// NOTE: Error handling from here is out of usual order.
+		var successIDs []string
+		successIDs, sendError = callback(ctx, msgRows)
+		// NOTE: sendError is handled at the end, the transaction should still be
+		// committed.
 
-		successIDs, sendError := callback(ctx, msgRows)
+		log.WithField(ctx, "successCount", len(successIDs)).Debug("published outbox messages")
 
-		res, deleteError := tx.Delete(ctx, sq.
-			Delete("outbox").
-			Where("id = ANY(?)", pq.Array(successIDs)))
-
-		if sendError != nil {
-			return fmt.Errorf("error sending batch of outbox messages: %w", sendError)
-		}
-
+		res, deleteError := tx.Exec(ctx, "DELETE FROM outbox WHERE id = ANY($1)", successIDs)
 		if deleteError != nil {
 			return fmt.Errorf("error deleting sent outbox messages: %w", deleteError)
 		}
-		rowsAffected, err := res.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("error getting rows affected: %w", err)
-		}
+
+		rowsAffected := res.RowsAffected()
 		if rowsAffected != int64(len(successIDs)) {
 			return fmt.Errorf("expected to delete %d rows, but deleted %d", len(successIDs), rowsAffected)
 		}
-
 		return nil
-	})
-	return count, err
+	}()
+
+	if err != nil {
+		_ = tx.Rollback(ctx)
+		return 0, err
+	}
+
+	err = tx.Commit(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("error committing transaction: %w", err)
+	}
+
+	if sendError != nil {
+		return 0, fmt.Errorf("error sending batch of outbox messages: %w", sendError)
+	}
+
+	return count, nil
 }

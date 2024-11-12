@@ -2,10 +2,6 @@ package pgclient
 
 import (
 	"context"
-	"net"
-	"time"
-
-	"github.com/lib/pq"
 )
 
 type AuthClient interface {
@@ -14,8 +10,7 @@ type AuthClient interface {
 
 type PGConnector interface {
 	Name() string
-	PQDialer(context.Context) (pq.Dialer, string, error)
-	ConnectToServer(context.Context) (*Frontend, error)
+	DSN(ctx context.Context) (string, error)
 }
 
 type directConnector struct {
@@ -30,17 +25,22 @@ func NewDirectConnector(name, dsn string) PGConnector {
 	}
 }
 
-func (dc *directConnector) PQDialer(_ context.Context) (pq.Dialer, string, error) {
-	return NetDialer{}, dc.dsn, nil
-}
-
 func (dc *directConnector) Name() string {
 	return dc.name
 }
 
-func (dc *directConnector) ConnectToServer(ctx context.Context) (*Frontend, error) {
-	return dialPGX(ctx, dc.dsn)
+func (dc *directConnector) DSN(context.Context) (string, error) {
+	return dc.dsn, nil
+}
 
+/*
+
+func (dc *directConnector) ConnectToServer(ctx context.Context) (*Frontend, error) {
+	return dialFrontend(ctx, dc.dsn)
+}
+
+func (dc *directConnector) ConnectPGX(ctx context.Context) (*pgx.Conn, error) {
+	return pgx.Connect(ctx, dc.dsn)
 }
 
 type NetDialer struct{}
@@ -51,4 +51,4 @@ func (NetDialer) Dial(network, address string) (net.Conn, error) {
 
 func (NetDialer) DialTimeout(network, address string, timeout time.Duration) (net.Conn, error) {
 	return net.DialTimeout(network, address, timeout)
-}
+}*/

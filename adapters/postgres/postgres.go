@@ -11,14 +11,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/iancoleman/strcase"
-	"github.com/lib/pq"
 	"github.com/pentops/o5-runtime-sidecar/adapters/postgres/pgclient"
 )
 
 type PGConnector interface {
 	Name() string
-	PQDialer(context.Context) (pq.Dialer, string, error)
-	ConnectToServer(context.Context) (*pgclient.Frontend, error)
+	DSN(context.Context) (string, error)
 }
 
 type ConfigSet interface {

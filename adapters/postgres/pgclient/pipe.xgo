@@ -55,7 +55,13 @@ func (cc *Pipe) runClient(toClient net.Conn) {
 	log.WithField(ctx, "data", client.Data).Info("client connected")
 	defer client.Close()
 
-	server, err := cc.connector.ConnectToServer(ctx)
+	dsn, err := cc.connector.DSN()
+	if err != nil {
+		log.WithError(ctx, err).Error("pgproxy: error getting DSN")
+		return
+	}
+
+	server, err := dialFrontend(ctx, dsn)
 	if err != nil {
 		client.Fatal(ctx, "failed to connect to server")
 		log.WithError(ctx, err).Error("pgproxy: error connecting to server")
