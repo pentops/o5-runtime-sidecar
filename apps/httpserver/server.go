@@ -12,6 +12,7 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/rs/cors"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -94,6 +95,16 @@ func (hs *Router) RegisterService(ctx context.Context, service protoreflect.Serv
 }
 
 func (hs *Router) Run(ctx context.Context) error {
+
+	eg, ctx := errgroup.WithContext(ctx)
+
+	if hs.jwks != nil {
+
+		eg.Go(func() error {
+			return hs.jwks.Run(ctx)
+		})
+	}
+
 	lis, err := net.Listen("tcp", hs.addr)
 	if err != nil {
 		return fmt.Errorf("failed to listen: %w", err)
@@ -114,13 +125,19 @@ func (hs *Router) Run(ctx context.Context) error {
 		}
 	}()
 
-	err = srv.Serve(lis)
-	if err == nil {
+	eg.Go(func() error {
+		err = srv.Serve(lis)
+		if err == nil {
+			return nil
+		}
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
 		return nil
-	}
-	if errors.Is(err, http.ErrServerClosed) {
-		return nil
-	}
+	})
+
+	err = eg.Wait()
+
 	return err
 }
 
