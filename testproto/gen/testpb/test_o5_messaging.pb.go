@@ -87,6 +87,12 @@ func (msg *RequestMessage) O5MessageHeader() o5msg.Header {
 				ReplyTo: msg.Request.ReplyTo,
 			},
 		}
+	} else {
+		header.Extension = &messaging_pb.Message_Request_{
+			Request: &messaging_pb.Message_Request{
+				ReplyTo: "",
+			},
+		}
 	}
 	return header
 }
