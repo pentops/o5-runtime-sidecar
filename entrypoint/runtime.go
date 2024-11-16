@@ -7,11 +7,13 @@ import (
 	"io"
 	"strings"
 
-	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/awsmsg"
-	"github.com/pentops/o5-runtime-sidecar/protoread"
-	"github.com/pentops/o5-runtime-sidecar/sqslink"
+	"github.com/pentops/o5-runtime-sidecar/adapters/grpc_reflect"
+	"github.com/pentops/o5-runtime-sidecar/apps/bridge"
+	"github.com/pentops/o5-runtime-sidecar/apps/httpserver"
+	"github.com/pentops/o5-runtime-sidecar/apps/pgoutbox"
+	"github.com/pentops/o5-runtime-sidecar/apps/pgproxy"
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker"
 	"github.com/pentops/runner"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -20,15 +22,17 @@ import (
 var NothingToDoError = errors.New("no services configured")
 
 type Runtime struct {
-	queueWorker     *sqslink.Worker
-	sender          awsmsg.Publisher
-	jwks            *jwks.JWKSManager
-	adapter         *adapterServer
-	routerServer    *routerServer
-	outboxListeners []*outboxListener
+	sender Publisher
 
-	connections []io.Closer
-	endpoints   []string
+	queueWorker     *queueworker.App
+	adapter         *bridge.App
+	routerServer    *httpserver.Router
+	outboxListeners []*pgoutbox.App
+	postgresProxy   *pgproxy.App
+
+	connections  []io.Closer
+	endpoints    []string
+	endpointWait chan struct{}
 }
 
 func NewRuntime() *Runtime {
@@ -44,7 +48,9 @@ func (rt *Runtime) Close() error {
 	return nil
 }
 
-func (rt *Runtime) buildRunGroup() (*runner.Group, error) {
+func (rt *Runtime) Run(ctx context.Context) error {
+	log.Debug(ctx, "Sidecar Running")
+	defer rt.Close()
 
 	runGroup := runner.NewGroup(
 		runner.WithName("runtime"),
@@ -52,27 +58,9 @@ func (rt *Runtime) buildRunGroup() (*runner.Group, error) {
 	)
 
 	didAnything := false
-
-	if rt.jwks != nil {
-		// doesn't count as doing anything
-		runGroup.Add("jwks", rt.jwks.Run)
-	}
-
-	for _, outbox := range rt.outboxListeners {
+	if rt.postgresProxy != nil {
 		didAnything = true
-		runGroup.Add(outbox.Name, outbox.Run)
-	}
-
-	if rt.routerServer != nil {
-		// TODO: Metrics
-		didAnything = true
-
-		runGroup.Add("router", rt.routerServer.Run)
-	}
-
-	if rt.queueWorker != nil {
-		didAnything = true
-		runGroup.Add("worker", rt.queueWorker.Run)
+		runGroup.Add("postgres-proxy", rt.postgresProxy.Run)
 	}
 
 	if rt.adapter != nil {
@@ -80,29 +68,47 @@ func (rt *Runtime) buildRunGroup() (*runner.Group, error) {
 		runGroup.Add("adapter", rt.adapter.Run)
 	}
 
-	if !didAnything {
-		return nil, NothingToDoError
+	if err := runGroup.Start(ctx); err != nil {
+		return fmt.Errorf("start goroutines: %w", err)
 	}
-	return runGroup, nil
-}
 
-func (rt *Runtime) Run(ctx context.Context) error {
-	log.Debug(ctx, "Sidecar Running")
-	defer rt.Close()
-
-	for _, endpoint := range rt.endpoints {
-		endpoint := endpoint
-		if err := rt.registerEndpoint(ctx, endpoint); err != nil {
-			return fmt.Errorf("register endpoint %s: %w", endpoint, err)
+	rt.endpointWait = make(chan struct{})
+	runGroup.Add("register-endpoints", func(ctx context.Context) error {
+		defer close(rt.endpointWait)
+		for _, endpoint := range rt.endpoints {
+			endpoint := endpoint
+			if err := rt.registerEndpoint(ctx, endpoint); err != nil {
+				return fmt.Errorf("register endpoint %s: %w", endpoint, err)
+			}
 		}
+		return nil
+	})
+
+	for _, outbox := range rt.outboxListeners {
+		didAnything = true
+		runGroup.Add(outbox.Name, outbox.Run)
 	}
 
-	runGroup, err := rt.buildRunGroup()
-	if err != nil {
-		return err
+	<-rt.endpointWait
+
+	if rt.routerServer != nil {
+		// TODO: Metrics
+		didAnything = true
+
+		runGroup.Add("router", rt.routerServer.Run)
+
 	}
 
-	if err := runGroup.Run(ctx); err != nil {
+	if rt.queueWorker != nil {
+		didAnything = true
+		runGroup.Add("worker", rt.queueWorker.Run)
+	}
+
+	if !didAnything {
+		return NothingToDoError
+	}
+
+	if err := runGroup.Wait(); err != nil {
 		log.WithError(ctx, err).Error("Error in goroutines")
 		return err
 	}
@@ -119,7 +125,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error 
 	}
 	rt.connections = append(rt.connections, conn)
 
-	prClient := protoread.NewClient(conn)
+	prClient := grpc_reflect.NewClient(conn)
 
 	services, err := prClient.FetchServices(ctx, conn)
 	if err != nil {

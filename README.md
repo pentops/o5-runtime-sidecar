@@ -18,3 +18,11 @@ The sidecar trusts the application's reflection proto, this is probably not
 great but have to start somewhere. Comparing the reflection proto to some
 central registry could be interesting but not in the initial scope.
 
+## Boot Process
+
+```mermaid
+sequenceDiagram
+
+
+
+```

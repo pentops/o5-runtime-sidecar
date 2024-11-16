@@ -1,9 +1,25 @@
 version: '2.4'
 
 services:
+  database:
+    image: postgres:14.2-alpine
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: test
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
   test:
     image: golang:1.22
     volumes:
       - ".:/src"
+    links:
+      - database
     working_dir: "/src"
     command: "go test ./..."
+    environment:
+      TEST_DB: "postgres://test:test@database/test?sslmode=disable"

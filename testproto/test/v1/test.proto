@@ -5,6 +5,8 @@ package test.v1;
 import "google/api/annotations.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "j5/messaging/v1/annotations.proto";
+import "j5/messaging/v1/reqres.proto";
 
 option go_package = "github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb";
 
@@ -97,4 +99,29 @@ message FooMessage {
   string id = 1;
   string name = 2;
   string field = 3;
+}
+
+service RequestTopic {
+  rpc Request(RequestMessage) returns (google.protobuf.Empty) {}
+
+  option (j5.messaging.v1.service) = {
+    topic_name: "reqres"
+    request: {}
+  };
+}
+
+message RequestMessage {
+  j5.messaging.v1.RequestMetadata request = 1;
+}
+
+service ReplyTopic {
+  rpc Reply(ReplyMessage) returns (google.protobuf.Empty) {}
+  option (j5.messaging.v1.service) = {
+    topic_name: "reqres"
+    reply: {}
+  };
+}
+
+message ReplyMessage {
+  j5.messaging.v1.RequestMetadata request = 1;
 }
