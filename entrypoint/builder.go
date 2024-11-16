@@ -5,11 +5,11 @@ import (
 	"os"
 
 	"github.com/pentops/o5-runtime-sidecar/adapters/eventbridge"
-	"github.com/pentops/o5-runtime-sidecar/adapters/postgres"
+	"github.com/pentops/o5-runtime-sidecar/adapters/pgclient"
 	"github.com/pentops/o5-runtime-sidecar/apps/bridge"
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver"
-	"github.com/pentops/o5-runtime-sidecar/apps/postgres/pgoutbox"
-	"github.com/pentops/o5-runtime-sidecar/apps/postgres/pgproxy"
+	"github.com/pentops/o5-runtime-sidecar/apps/pgoutbox"
+	"github.com/pentops/o5-runtime-sidecar/apps/pgproxy"
 	"github.com/pentops/o5-runtime-sidecar/apps/queueworker"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
 )
@@ -35,6 +35,8 @@ type Publisher interface {
 }
 
 func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
+	var err error
+
 	rt := NewRuntime()
 	rt.endpoints = envConfig.ServiceEndpoints
 
@@ -44,13 +46,16 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		SidecarVersion: envConfig.SidecarVersion,
 	}
 
-	if envConfig.EventBridgeARN != "" {
-		rt.sender = eventbridge.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeARN)
+	if envConfig.EventBridgeConfig.BusARN != "" {
+		rt.sender, err = eventbridge.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeConfig)
+		if err != nil {
+			return nil, fmt.Errorf("creating eventbridge publisher: %w", err)
+		}
 	}
 
 	os.Environ()
 
-	pgConfigs := postgres.NewConnectorSet(awsConfig, postgres.EnvProvider{})
+	pgConfigs := pgclient.NewConnectorSet(awsConfig, pgclient.EnvProvider{})
 
 	if len(envConfig.PostgresOutboxURI) > 0 {
 		if rt.sender == nil {

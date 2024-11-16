@@ -40,7 +40,12 @@ func TestEventBridge(t *testing.T) {
 		},
 	}
 
-	publisher := NewEventBridgePublisher(eventbridgeClient, "EVENTBRIDGE_ARN")
+	publisher, err := NewEventBridgePublisher(eventbridgeClient, EventBridgeConfig{
+		BusARN: "EVENTBRIDGE_ARN",
+	})
+	if err != nil {
+		t.Fatal(err.Error())
+	}
 
 	ctx := context.Background()
 	res, err := publisher.PublishBatch(ctx, []*messaging_pb.Message{{

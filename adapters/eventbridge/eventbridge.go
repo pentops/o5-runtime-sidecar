@@ -13,7 +13,7 @@ import (
 )
 
 type EventBridgeConfig struct {
-	EventBridgeARN string `env:"EVENTBRIDGE_ARN" default:""`
+	BusARN string `env:"EVENTBRIDGE_ARN" default:""`
 }
 
 const (
@@ -26,18 +26,21 @@ type EventBridgeAPI interface {
 
 type EventBridgePublisher struct {
 	client EventBridgeAPI
-	busARN string
+	EventBridgeConfig
 }
 
-func NewEventBridgePublisher(client EventBridgeAPI, busARN string) *EventBridgePublisher {
-	return &EventBridgePublisher{
-		client: client,
-		busARN: busARN,
+func NewEventBridgePublisher(client EventBridgeAPI, config EventBridgeConfig) (*EventBridgePublisher, error) {
+	if config.BusARN == "" {
+		return nil, fmt.Errorf("missing $EVENTBRIDGE_ARN")
 	}
+	return &EventBridgePublisher{
+		client:            client,
+		EventBridgeConfig: config,
+	}, nil
 }
 
 func (p *EventBridgePublisher) PublisherID() string {
-	return p.busARN
+	return p.EventBridgeConfig.BusARN
 }
 
 func (p *EventBridgePublisher) Publish(ctx context.Context, message *messaging_pb.Message) error {
@@ -54,7 +57,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 	// https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-putevent-size.html
 	entries := make([]types.PutEventsRequestEntry, len(messages))
 	for idx, msg := range messages {
-		entry, err := p.prepareMessage(msg)
+		entry, err := p.buildPutEventEntry(msg)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +78,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 		request := messages[idx]
 		if entry.ErrorCode != nil {
 			log.WithFields(ctx, map[string]interface{}{
-				"eventBusArn":  p.busARN,
+				"eventBusArn":  p.BusARN,
 				"messageId":    request.MessageId,
 				"errorCode":    *entry.ErrorCode,
 				"errorMessage": *entry.ErrorMessage,
@@ -87,7 +90,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 		}
 
 		log.WithFields(ctx, map[string]interface{}{
-			"eventBusArn": p.busARN,
+			"eventBusArn": p.BusARN,
 			"messageId":   request.MessageId,
 		}).Info("Published to EventBus")
 
@@ -97,7 +100,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 	return successfulIDs, firstError
 }
 
-func (p *EventBridgePublisher) prepareMessage(input *messaging_pb.Message) (*types.PutEventsRequestEntry, error) {
+func (p *EventBridgePublisher) buildPutEventEntry(input *messaging_pb.Message) (*types.PutEventsRequestEntry, error) {
 
 	// eventbridge requires JSON bodies.
 	detai, err := protojson.Marshal(input)
@@ -111,7 +114,7 @@ func (p *EventBridgePublisher) prepareMessage(input *messaging_pb.Message) (*typ
 		Detail:       aws.String(string(detai)),
 		DetailType:   aws.String(EventBridgeO5MessageDetailType),
 		Source:       aws.String(source),
-		EventBusName: aws.String(p.busARN),
+		EventBusName: aws.String(p.BusARN),
 	}
 
 	return entry, nil

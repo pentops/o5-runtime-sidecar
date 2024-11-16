@@ -29,32 +29,6 @@ func NewAuroraConnector(name string, creds AuthClient) (PGConnector, error) {
 	}, nil
 }
 
-/*
-func (ac *auroraConnector) PQDialer(ctx context.Context) (pq.Dialer, string, error) {
-	pipe, err := NewPipe(ctx, ac)
-	if err != nil {
-		return nil, "", fmt.Errorf("creating pipe: %w", err)
-	}
-	return pipe, fmt.Sprintf("dbname=%s user=%s sslmode=disable", ac.name, ac.name), nil
-}
-
-func (ac *auroraConnector) ConnectToServer(ctx context.Context) (*Frontend, error) {
-	endpoint, err := ac.creds.ConnectionString(ctx, ac.name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection string: %w", err)
-	}
-	return dialFrontend(ctx, endpoint)
-}
-
-func (ac *auroraConnector) ConnectPGX(ctx context.Context) (*pgx.Conn, error) {
-	endpoint, err := ac.creds.ConnectionString(ctx, ac.name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create connection string: %w", err)
-	}
-	return pgx.Connect(ctx, endpoint)
-}
-*/
-
 func (ac *auroraConnector) Name() string {
 	return ac.name
 }

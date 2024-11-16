@@ -127,6 +127,16 @@ func parseOutboxMessage(row outboxRow, source sidecar.AppInfo) (*messaging_pb.Me
 	}
 	msg.Headers["o5-sidecar-outbox-version"] = source.SidecarVersion
 
+	switch ext := msg.Extension.(type) {
+	case *messaging_pb.Message_Request_:
+		// this value is copied to the message body's request.reply_to field by the
+		// receiver's sidecar.
+		// The receiver app copies the request field from the request to the reply.
+		// The generated code for the reply message copies the reply_to field to the
+		// message wrapper's Reply.ReplyTo field, allowing the queue subscription rules to filter the reply.
+		ext.Request.ReplyTo = fmt.Sprintf("%s/%s", source.SourceEnv, source.SourceApp)
+	}
+
 	return msg, nil
 }
 

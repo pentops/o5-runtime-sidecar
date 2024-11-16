@@ -16,24 +16,24 @@ require (
 	github.com/jackc/pgx/v5 v5.5.1
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d
-	github.com/pentops/flowtest v0.0.0-20241005200401-85365de288f3
-	github.com/pentops/j5 v0.0.0-20241012210806-5048599e7161
+	github.com/pentops/flowtest v0.0.0-20241110231021-42663ac00b63
+	github.com/pentops/j5 v0.0.0-20241104203331-fb5a90a95412
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
-	github.com/pentops/log.go v0.0.0-20240930194039-e8e09c525e33
-	github.com/pentops/o5-messaging v0.0.0-20240925203152-81b197123419
+	github.com/pentops/log.go v0.0.0-20241106053730-7ac2afa77d54
+	github.com/pentops/o5-messaging v0.0.0-20241022213149-9d093fed7feb
 	github.com/pentops/runner v0.0.0-20241010184552-1a959b902d93
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/sync v0.8.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20240903143218-8af14fe29dc1
-	google.golang.org/grpc v1.67.0
-	google.golang.org/protobuf v1.34.2
+	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38
+	google.golang.org/grpc v1.67.1
+	google.golang.org/protobuf v1.35.1
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 
 require (
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.34.2-20240717164558-a6c49f84cc0f.2 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.35.1-20240920164238-5a7b106cbb87.1 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.27 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.11 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.15 // indirect
@@ -56,11 +56,11 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
-	golang.org/x/crypto v0.27.0 // indirect
+	golang.org/x/crypto v0.28.0 // indirect
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0 // indirect
-	golang.org/x/net v0.29.0 // indirect
-	golang.org/x/sys v0.25.0 // indirect
-	golang.org/x/text v0.18.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240930140551-af27646dc61f // indirect
+	golang.org/x/net v0.30.0 // indirect
+	golang.org/x/sys v0.26.0 // indirect
+	golang.org/x/text v0.19.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

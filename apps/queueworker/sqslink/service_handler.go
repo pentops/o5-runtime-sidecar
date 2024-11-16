@@ -77,5 +77,54 @@ func (ss service) parseMessageBody(message *messaging_pb.Message) (proto.Message
 		return nil, fmt.Errorf("unknown wire encoding: %v", body.Encoding)
 	}
 
+	switch ext := message.Extension.(type) {
+	case *messaging_pb.Message_Request_:
+		// The handler is the server which receives the request and replies to it.
+		// The message metadata contains the platform level reply-to information
+		// which the sidecar sending the request has set.
+		// Both the Request and Reply message should have a 'request' field which is
+		//j5.messaging.v1.RequestMetadata
+		replyTo := ext.Request.ReplyTo
+		if replyTo != "" {
+			if err := setReplyTo(msg, replyTo); err != nil {
+				return nil, fmt.Errorf("failed to set reply-to: %w", err)
+			}
+		}
+	}
+
 	return msg, nil
+}
+
+func setReplyTo(msg proto.Message, dest string) error {
+
+	refl := msg.ProtoReflect()
+	desc := refl.Descriptor()
+	fields := desc.Fields()
+	for i := 0; i < fields.Len(); i++ {
+		field := fields.Get(i)
+		if field.Kind() != protoreflect.MessageKind {
+			continue
+		}
+
+		metadataMessageField := field.Message()
+		if metadataMessageField.FullName() != "j5.messaging.v1.RequestMetadata" {
+			continue
+		}
+
+		metadataMessage := refl.Mutable(field).Message()
+		if !metadataMessage.IsValid() {
+			return fmt.Errorf("reply metadata message is not valid (not set)")
+		}
+
+		replyField := metadataMessage.Descriptor().Fields().ByName("reply_to")
+		if field == nil {
+			return fmt.Errorf("reply_to field not found in request metadata")
+		}
+
+		metadataMessage.Set(replyField, protoreflect.ValueOfString(dest))
+
+		return nil
+	}
+
+	return fmt.Errorf("request field not found")
 }

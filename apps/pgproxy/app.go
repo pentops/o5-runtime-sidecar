@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/pentops/o5-runtime-sidecar/adapters/postgres"
+	"github.com/pentops/o5-runtime-sidecar/adapters/pgclient"
 )
 
 type ProxyConfig struct {
@@ -17,9 +17,9 @@ type App struct {
 	listener *Listener
 }
 
-func NewApp(cfg ProxyConfig, pgConfigs postgres.ConfigSet) (*App, error) {
+func NewApp(cfg ProxyConfig, pgConfigs pgclient.ConfigSet) (*App, error) {
 
-	connectors := map[string]postgres.PGConnector{}
+	connectors := map[string]pgclient.PGConnector{}
 	for _, rawVar := range cfg.PostgresProxy {
 		conn, err := pgConfigs.GetConnector(rawVar)
 		if err != nil {

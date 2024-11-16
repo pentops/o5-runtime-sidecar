@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pentops/o5-runtime-sidecar/adapters/postgres"
+	"github.com/pentops/o5-runtime-sidecar/adapters/pgclient"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
 )
 
@@ -17,7 +17,7 @@ type App struct {
 	*Listener
 }
 
-func NewApps(envConfig OutboxConfig, srcConfig sidecar.AppInfo, sender Batcher, pgConfigs postgres.ConfigSet) ([]*App, error) {
+func NewApps(envConfig OutboxConfig, srcConfig sidecar.AppInfo, sender Batcher, pgConfigs pgclient.ConfigSet) ([]*App, error) {
 	var apps []*App
 	for _, rawVar := range envConfig.PostgresOutboxURI {
 		conn, err := pgConfigs.GetConnector(rawVar)
@@ -34,7 +34,7 @@ func NewApps(envConfig OutboxConfig, srcConfig sidecar.AppInfo, sender Batcher, 
 	return apps, nil
 }
 
-func NewApp(conn postgres.PGConnector, batcher Batcher, source sidecar.AppInfo) (*App, error) {
+func NewApp(conn pgclient.PGConnector, batcher Batcher, source sidecar.AppInfo) (*App, error) {
 	name := conn.Name()
 	ll, err := NewListener(conn, batcher, source)
 	if err != nil {

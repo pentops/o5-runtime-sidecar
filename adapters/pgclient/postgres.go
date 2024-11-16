@@ -1,4 +1,4 @@
-package postgres
+package pgclient
 
 import (
 	"context"
@@ -11,7 +11,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/iancoleman/strcase"
-	"github.com/pentops/o5-runtime-sidecar/adapters/postgres/pgclient"
 )
 
 type PGConnector interface {
@@ -37,7 +36,7 @@ type AWSProvider interface {
 type pgConnSet struct {
 	configs     ConfigProvider
 	awsProvider AWSProvider
-	credBuilder *pgclient.CredBuilder
+	credBuilder *CredBuilder
 	connectors  map[string]PGConnector
 }
 
@@ -69,25 +68,25 @@ func (ss *pgConnSet) direct(name, raw string) (PGConnector, error) {
 	if conn, ok := ss.connectors[name]; ok {
 		return conn, nil
 	}
-	conn := pgclient.NewDirectConnector(name, raw)
+	conn := NewDirectConnector(name, raw)
 	ss.connectors[name] = conn
 	return conn, nil
 }
 
-func (ss *pgConnSet) aurora(name string, config *pgclient.AuroraConfig) (PGConnector, error) {
+func (ss *pgConnSet) aurora(name string, config *AuroraConfig) (PGConnector, error) {
 	if conn, ok := ss.connectors[name]; ok {
 		return conn, nil
 	}
 
 	if ss.credBuilder == nil {
-		ss.credBuilder = pgclient.NewCredBuilder(ss.awsProvider.Credentials(), ss.awsProvider.Region())
+		ss.credBuilder = NewCredBuilder(ss.awsProvider.Credentials(), ss.awsProvider.Region())
 	}
 
 	if err := ss.credBuilder.AddConfig(name, config); err != nil {
 		return nil, fmt.Errorf("adding config for %q: %w", name, err)
 	}
 
-	conn, err := pgclient.NewAuroraConnector(name, ss.credBuilder)
+	conn, err := NewAuroraConnector(name, ss.credBuilder)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +130,7 @@ func (ss *pgConnSet) GetConnector(raw string) (PGConnector, error) {
 		return nil, fmt.Errorf("invalid DB credentials in $%s, expecing a DSN or JSON value", envVarName)
 	}
 
-	config := &pgclient.AuroraConfig{}
+	config := &AuroraConfig{}
 	if err := json.Unmarshal([]byte(envCreds), config); err != nil {
 		return nil, fmt.Errorf("invalid JSON in $%s: %w", envVarName, err)
 	}

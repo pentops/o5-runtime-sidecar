@@ -11,17 +11,17 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/adapters/postgres"
-	"github.com/pentops/o5-runtime-sidecar/adapters/postgres/pgserver"
+	"github.com/pentops/o5-runtime-sidecar/adapters/pgclient"
+	"github.com/pentops/o5-runtime-sidecar/apps/pgproxy/pgserver"
 )
 
 type Listener struct {
-	dbs     map[string]postgres.PGConnector
+	dbs     map[string]pgclient.PGConnector
 	bind    string
 	network string
 }
 
-func NewListener(network, bind string, dbs map[string]postgres.PGConnector) (*Listener, error) {
+func NewListener(network, bind string, dbs map[string]pgclient.PGConnector) (*Listener, error) {
 	if network == "unix" {
 		if err := os.MkdirAll(filepath.Dir(bind), 0755); err != nil {
 			return nil, fmt.Errorf("failed to create directory for unix socket: %w", err)
