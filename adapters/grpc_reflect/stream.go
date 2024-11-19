@@ -3,6 +3,7 @@ package grpc_reflect
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/pentops/log.go/log"
@@ -57,7 +58,11 @@ func (rs *reflStream) listServices(_ context.Context) (*grpc_reflection_v1.ListS
 	if err != nil {
 		return nil, err
 	}
-	return d.GetListServicesResponse(), nil
+	resp := d.GetListServicesResponse()
+	if resp == nil {
+		return nil, errors.New("no list services response")
+	}
+	return resp, nil
 }
 
 func (rs *reflStream) fileContainingSymbol(_ context.Context, symbol string) (*grpc_reflection_v1.FileDescriptorResponse, error) {
@@ -69,7 +74,11 @@ func (rs *reflStream) fileContainingSymbol(_ context.Context, symbol string) (*g
 	if err != nil {
 		return nil, err
 	}
-	return d.GetFileDescriptorResponse(), nil
+	resp := d.GetFileDescriptorResponse()
+	if resp == nil {
+		return nil, fmt.Errorf("no file descriptor response for symbol %s", symbol)
+	}
+	return resp, nil
 }
 
 func (rs *reflStream) file(_ context.Context, path string) (*grpc_reflection_v1.FileDescriptorResponse, error) {
@@ -81,5 +90,9 @@ func (rs *reflStream) file(_ context.Context, path string) (*grpc_reflection_v1.
 	if err != nil {
 		return nil, err
 	}
-	return d.GetFileDescriptorResponse(), nil
+	resp := d.GetFileDescriptorResponse()
+	if resp == nil {
+		return nil, fmt.Errorf("no file descriptor response for file %s", path)
+	}
+	return resp, nil
 }
