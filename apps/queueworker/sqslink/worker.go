@@ -231,6 +231,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 			return
 		}
 		log.Debug(ctx, "Message Handler: Killed")
+		return
 	} else {
 		log.Info(ctx, "Message Handler: Success")
 	}
@@ -290,5 +291,18 @@ func (ww *Worker) killMessage(ctx context.Context, sqsMsg types.Message, msg *me
 		},
 	}
 
-	return ww.deadLetterHandler.DeadMessage(ctx, death)
+	err := ww.deadLetterHandler.DeadMessage(ctx, death)
+	if err != nil {
+		return err
+	}
+
+	// Delete
+	_, err = ww.SQSClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+		QueueUrl:      &ww.QueueURL,
+		ReceiptHandle: sqsMsg.ReceiptHandle,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
