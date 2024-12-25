@@ -27,7 +27,7 @@ func NewApp(config WorkerConfig, info sidecar.AppInfo, publisher sqslink.Publish
 	var dlh sqslink.DeadLetterHandler
 	if !config.NoDeadLetters {
 		if publisher == nil {
-			return nil, fmt.Errorf("outbox requires a sender (set EVENTBRIDGE_ARN)")
+			return nil, fmt.Errorf("SQS queue worker requires a sender for dead letters (set EVENTBRIDGE_ARN)")
 		}
 
 		dlh = sqslink.NewO5MessageDeadLetterHandler(publisher, info)
@@ -43,6 +43,6 @@ func (app *App) Run(ctx context.Context) error {
 	return app.queueWorker.Run(ctx)
 }
 
-func (app *App) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker sqslink.Invoker) error {
+func (app *App) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker sqslink.AppLink) error {
 	return app.queueWorker.RegisterService(ctx, service, invoker)
 }

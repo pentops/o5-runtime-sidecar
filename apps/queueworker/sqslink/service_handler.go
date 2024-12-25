@@ -15,13 +15,14 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-type Invoker interface {
+type AppLink interface {
 	Invoke(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
+	JSONToProto(body []byte, msg protoreflect.Message) error
 }
 
 type service struct {
 	requestMessage protoreflect.MessageDescriptor
-	invoker        Invoker
+	invoker        AppLink
 	fullName       string
 }
 
@@ -73,6 +74,12 @@ func (ss service) parseMessageBody(message *messaging_pb.Message) (proto.Message
 		if err := protojson.Unmarshal(body.Value, msg); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal json: %w", err)
 		}
+
+	case messaging_pb.WireEncoding_J5_JSON:
+		if err := ss.invoker.JSONToProto(body.Value, msg); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal j5 json: %w", err)
+		}
+
 	default:
 		return nil, fmt.Errorf("unknown wire encoding: %v", body.Encoding)
 	}

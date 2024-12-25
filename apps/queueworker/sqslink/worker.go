@@ -81,7 +81,7 @@ func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resen
 	}
 }
 
-func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker Invoker) error {
+func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker AppLink) error {
 	methods := service.Methods()
 	for ii := 0; ii < methods.Len(); ii++ {
 		method := methods.Get(ii)
@@ -92,7 +92,7 @@ func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.Serv
 	return nil
 }
 
-func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker Invoker) error {
+func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker AppLink) error {
 	serviceName := method.Parent().(protoreflect.ServiceDescriptor).FullName()
 	ss := &service{
 		requestMessage: method.Input(),

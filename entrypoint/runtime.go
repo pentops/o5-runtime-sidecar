@@ -146,7 +146,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error 
 			if rt.queueWorker == nil {
 				return fmt.Errorf("topic %s requires an SQS URL", name)
 			}
-			if err := rt.queueWorker.RegisterService(ctx, ss, conn); err != nil {
+			if err := rt.queueWorker.RegisterService(ctx, ss, prClient); err != nil {
 				return fmt.Errorf("register worker %s: %w", name, err)
 			}
 		default:
