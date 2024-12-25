@@ -2,9 +2,9 @@ package entrypoint
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/pentops/o5-runtime-sidecar/adapters/eventbridge"
+	"github.com/pentops/o5-runtime-sidecar/adapters/msgconvert"
 	"github.com/pentops/o5-runtime-sidecar/adapters/pgclient"
 	"github.com/pentops/o5-runtime-sidecar/apps/bridge"
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver"
@@ -45,6 +45,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		SourceEnv:      envConfig.EnvironmentName,
 		SidecarVersion: envConfig.SidecarVersion,
 	}
+	rt.msgConverter = msgconvert.NewConverter(srcConfig)
 
 	if envConfig.EventBridgeConfig.BusARN != "" {
 		rt.sender, err = eventbridge.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeConfig)
@@ -53,21 +54,21 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		}
 	}
 
-	os.Environ()
-
 	pgConfigs := pgclient.NewConnectorSet(awsConfig, pgclient.EnvProvider{})
 
-	if len(envConfig.PostgresOutboxURI) > 0 {
+	// Listen to a Postgres outbox table
+	if len(envConfig.OutboxConfig.PostgresOutboxURI) > 0 {
 		if rt.sender == nil {
 			return nil, fmt.Errorf("outbox requires a sender (set EVENTBRIDGE_ARN)")
 		}
-		apps, err := pgoutbox.NewApps(envConfig.OutboxConfig, srcConfig, rt.sender, pgConfigs)
+		apps, err := pgoutbox.NewApps(envConfig.OutboxConfig, rt.msgConverter, rt.sender, pgConfigs)
 		if err != nil {
 			return nil, fmt.Errorf("creating outbox listener: %w", err)
 		}
 		rt.outboxListeners = append(rt.outboxListeners, apps...)
 	}
 
+	// Proxy a Postgres connection, handling IAM auth
 	if len(envConfig.PostgresProxy) > 0 {
 		proxy, err := pgproxy.NewApp(envConfig.ProxyConfig, pgConfigs)
 		if err != nil {
@@ -76,6 +77,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		rt.postgresProxy = proxy
 	}
 
+	// Subscribe to SQS messages
 	if envConfig.WorkerConfig.SQSURL != "" {
 		worker, err := queueworker.NewApp(envConfig.WorkerConfig, srcConfig, rt.sender, awsConfig.SQS())
 		if err != nil {
@@ -84,13 +86,15 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 		rt.queueWorker = worker
 	}
 
-	if envConfig.AdapterAddr != "" {
+	// Serve an internal gRPC server, for the app to use messaging without an outbox
+	if envConfig.BridgeConfig.AdapterAddr != "" {
 		if rt.sender == nil {
 			return nil, fmt.Errorf("bridge requires a sender")
 		}
-		rt.adapter = bridge.NewApp(envConfig.AdapterAddr, rt.sender, srcConfig)
+		rt.adapter = bridge.NewApp(envConfig.AdapterAddr, rt.sender, rt.msgConverter)
 	}
 
+	// Serve a public HTTP server
 	if envConfig.PublicAddr != "" {
 		router, err := httpserver.NewRouter(envConfig.ServerConfig, srcConfig)
 		if err != nil {

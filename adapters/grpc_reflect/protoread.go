@@ -39,6 +39,14 @@ func NewClient(conn *grpc.ClientConn) *ReflectionClient {
 	return rc
 }
 
+func (cl *ReflectionClient) Name() string {
+	return cl.conn.Target()
+}
+
+func (cl *ReflectionClient) Close() error {
+	return cl.conn.Close()
+}
+
 func (cl *ReflectionClient) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) error {
 	return grpc.Invoke(ctx, method, req, res, cl.conn, opts...)
 }
@@ -108,7 +116,7 @@ func (cl *ReflectionClient) fetchAndInclude(name protoreflect.FullName) (protore
 }
 
 // FetchServices fetches the full reflection descriptor of all exposed services from a grpc server
-func (cl *ReflectionClient) FetchServices(ctx context.Context, conn *grpc.ClientConn) ([]protoreflect.ServiceDescriptor, error) {
+func (cl *ReflectionClient) FetchServices(ctx context.Context) ([]protoreflect.ServiceDescriptor, error) {
 
 	stream, err := newStream(ctx, cl.reflectionClient)
 	if err != nil {

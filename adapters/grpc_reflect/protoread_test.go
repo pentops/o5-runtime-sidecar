@@ -27,7 +27,7 @@ func TestProtoReadHappy(t *testing.T) {
 
 	cl := NewClient(grpcPair.Client)
 
-	desc, err := cl.FetchServices(ctx, grpcPair.Client)
+	desc, err := cl.FetchServices(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}

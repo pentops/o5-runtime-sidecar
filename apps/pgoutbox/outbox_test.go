@@ -12,6 +12,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
+	"github.com/pentops/o5-runtime-sidecar/adapters/msgconvert"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
 	"github.com/pressly/goose"
 
@@ -113,7 +114,8 @@ func TestOutbox(t *testing.T) {
 		dsn: dbURL,
 	}
 
-	ll, err := NewListener(conn, batcher, source)
+	conv := msgconvert.NewConverter(source)
+	ll, err := NewListener(conn, batcher, conv)
 	if err != nil {
 		t.Fatalf("failed to create outbox listener: %s", err)
 	}

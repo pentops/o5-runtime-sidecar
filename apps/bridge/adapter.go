@@ -7,7 +7,6 @@ import (
 
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
-	"github.com/pentops/o5-runtime-sidecar/sidecar"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -23,8 +22,8 @@ type App struct {
 	listening chan struct{}
 }
 
-func NewApp(bind string, sender Publisher, source sidecar.AppInfo) *App {
-	messageBridge := NewMessageBridge(sender, source)
+func NewApp(bind string, sender Publisher, conv Converter) *App {
+	messageBridge := NewMessageBridge(sender, conv)
 	server := grpc.NewServer()
 	messaging_tpb.RegisterMessageBridgeTopicServer(server, messageBridge)
 	reflection.Register(server)

@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/adapters/grpc_reflect"
+	"github.com/pentops/o5-runtime-sidecar/adapters/msgconvert"
 	"github.com/pentops/o5-runtime-sidecar/apps/bridge"
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver"
 	"github.com/pentops/o5-runtime-sidecar/apps/pgoutbox"
@@ -30,9 +30,11 @@ type Runtime struct {
 	outboxListeners []*pgoutbox.App
 	postgresProxy   *pgproxy.App
 
-	connections  []io.Closer
-	endpoints    []string
-	endpointWait chan struct{}
+	msgConverter *msgconvert.Converter
+
+	reflectionClients []*grpc_reflect.ReflectionClient
+	endpoints         []string
+	endpointWait      chan struct{}
 }
 
 func NewRuntime() *Runtime {
@@ -40,7 +42,7 @@ func NewRuntime() *Runtime {
 }
 
 func (rt *Runtime) Close() error {
-	for _, conn := range rt.connections {
+	for _, conn := range rt.reflectionClients {
 		if err := conn.Close(); err != nil {
 			return err
 		}
@@ -77,10 +79,23 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		defer close(rt.endpointWait)
 		for _, endpoint := range rt.endpoints {
 			endpoint := endpoint
-			if err := rt.registerEndpoint(ctx, endpoint); err != nil {
-				return fmt.Errorf("register endpoint %s: %w", endpoint, err)
+			prClient, err := rt.connectEndpoint(endpoint)
+			if err != nil {
+				return fmt.Errorf("connect to endpoint %s: %w", endpoint, err)
+			}
+
+			rt.reflectionClients = append(rt.reflectionClients, prClient)
+
+			if err := rt.registerEndpoint(ctx, prClient); err != nil {
+				return fmt.Errorf("register endpoint %s: %w", prClient.Name(), err)
 			}
 		}
+
+		if len(rt.reflectionClients) == 1 {
+			// TODO: Handle multiple clients
+			rt.msgConverter.SetReflectionClient(rt.reflectionClients[0])
+		}
+
 		return nil
 	})
 
@@ -117,17 +132,18 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	return nil
 }
 
-func (rt *Runtime) registerEndpoint(ctx context.Context, endpoint string) error {
-
+func (rt *Runtime) connectEndpoint(endpoint string) (*grpc_reflect.ReflectionClient, error) {
 	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return fmt.Errorf("dial: %w", err)
+		return nil, fmt.Errorf("dial: %w", err)
 	}
-	rt.connections = append(rt.connections, conn)
 
-	prClient := grpc_reflect.NewClient(conn)
+	return grpc_reflect.NewClient(conn), nil
+}
 
-	services, err := prClient.FetchServices(ctx, conn)
+func (rt *Runtime) registerEndpoint(ctx context.Context, prClient *grpc_reflect.ReflectionClient) error {
+
+	services, err := prClient.FetchServices(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}

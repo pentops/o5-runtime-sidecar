@@ -7,8 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/sidecar"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 )
@@ -17,21 +15,25 @@ type Batcher interface {
 	PublishBatch(ctx context.Context, messages []*messaging_pb.Message) ([]string, error)
 }
 
+type Parser interface {
+	ParseMessage(id string, data []byte) (*messaging_pb.Message, error)
+}
+
 type pgConnector interface {
 	DSN(ctx context.Context) (string, error)
 }
 
 type Listener struct {
 	connector pgConnector
-	source    sidecar.AppInfo
 	publisher Batcher
+	parser    Parser
 }
 
-func NewListener(connector pgConnector, publisher Batcher, sourceConfig sidecar.AppInfo) (*Listener, error) {
+func NewListener(connector pgConnector, publisher Batcher, parser Parser) (*Listener, error) {
 	return &Listener{
 		connector: connector,
-		source:    sourceConfig,
 		publisher: publisher,
+		parser:    parser,
 	}, nil
 }
 
@@ -101,7 +103,7 @@ func (ll *Listener) Listen(ctx context.Context) error {
 func (ll *Listener) rowsCallback(ctx context.Context, rows []outboxRow) ([]string, error) {
 	msgs := make([]*messaging_pb.Message, len(rows))
 	for idx, row := range rows {
-		msg, err := parseOutboxMessage(row, ll.source)
+		msg, err := ll.parseOutboxMessage(row)
 		if err != nil {
 			return nil, err
 		}
@@ -112,31 +114,11 @@ func (ll *Listener) rowsCallback(ctx context.Context, rows []outboxRow) ([]strin
 	return ll.publisher.PublishBatch(ctx, msgs)
 }
 
-func parseOutboxMessage(row outboxRow, source sidecar.AppInfo) (*messaging_pb.Message, error) {
-	msg := &messaging_pb.Message{}
-	if err := protojson.Unmarshal(row.message, msg); err != nil {
-		return nil, fmt.Errorf("error unmarshalling outbox message: %w", err)
+func (ll *Listener) parseOutboxMessage(row outboxRow) (*messaging_pb.Message, error) {
+	msg, err := ll.parser.ParseMessage(row.id, row.message)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing outbox message: %w", err)
 	}
-
-	msg.MessageId = row.id
-	msg.SourceApp = source.SourceApp
-	msg.SourceEnv = source.SourceEnv
-
-	if msg.Headers == nil {
-		msg.Headers = map[string]string{}
-	}
-	msg.Headers["o5-sidecar-outbox-version"] = source.SidecarVersion
-
-	switch ext := msg.Extension.(type) {
-	case *messaging_pb.Message_Request_:
-		// this value is copied to the message body's request.reply_to field by the
-		// receiver's sidecar.
-		// The receiver app copies the request field from the request to the reply.
-		// The generated code for the reply message copies the reply_to field to the
-		// message wrapper's Reply.ReplyTo field, allowing the queue subscription rules to filter the reply.
-		ext.Request.ReplyTo = fmt.Sprintf("%s/%s", source.SourceEnv, source.SourceApp)
-	}
-
 	return msg, nil
 }
 

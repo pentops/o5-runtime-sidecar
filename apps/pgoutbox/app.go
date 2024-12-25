@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/pentops/o5-runtime-sidecar/adapters/pgclient"
-	"github.com/pentops/o5-runtime-sidecar/sidecar"
 )
 
 type OutboxConfig struct {
@@ -17,7 +16,7 @@ type App struct {
 	*Listener
 }
 
-func NewApps(envConfig OutboxConfig, srcConfig sidecar.AppInfo, sender Batcher, pgConfigs pgclient.ConfigSet) ([]*App, error) {
+func NewApps(envConfig OutboxConfig, parser Parser, sender Batcher, pgConfigs pgclient.ConfigSet) ([]*App, error) {
 	var apps []*App
 	for _, rawVar := range envConfig.PostgresOutboxURI {
 		conn, err := pgConfigs.GetConnector(rawVar)
@@ -25,7 +24,7 @@ func NewApps(envConfig OutboxConfig, srcConfig sidecar.AppInfo, sender Batcher, 
 			return nil, fmt.Errorf("building postgres connection: %w", err)
 		}
 
-		app, err := NewApp(conn, sender, srcConfig)
+		app, err := NewApp(conn, sender, parser)
 		if err != nil {
 			return nil, fmt.Errorf("creating outbox listener: %w", err)
 		}
@@ -34,9 +33,9 @@ func NewApps(envConfig OutboxConfig, srcConfig sidecar.AppInfo, sender Batcher, 
 	return apps, nil
 }
 
-func NewApp(conn pgclient.PGConnector, batcher Batcher, source sidecar.AppInfo) (*App, error) {
+func NewApp(conn pgclient.PGConnector, batcher Batcher, parser Parser) (*App, error) {
 	name := conn.Name()
-	ll, err := NewListener(conn, batcher, source)
+	ll, err := NewListener(conn, batcher, parser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create outbox listener: %w", err)
 	}
