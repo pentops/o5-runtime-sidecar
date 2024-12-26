@@ -32,17 +32,6 @@ type SNSMessageWrapper struct {
 	Timestamp string `json:"Timestamp"`
 }
 
-type EventBridgeWrapper struct {
-	Detail       json.RawMessage `json:"detail"`
-	DetailType   string          `json:"detail-type"`
-	EventBusName string          `json:"eventBusName"`
-	Source       string          `json:"source"`
-	Account      string          `json:"account"`
-	Region       string          `json:"region"`
-	Resources    []string        `json:"resources"`
-	Time         string          `json:"time"`
-}
-
 var messageIDNamespace = uuid.MustParse("B71AFF66-460A-424C-8927-9AF8C9135BF9")
 
 var SQSMessageAttributes = []string{
@@ -60,7 +49,7 @@ func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
 	// Try to parse various wrapper methods
 
 	// EventBridge
-	wrapper := &EventBridgeWrapper{}
+	wrapper := &eventbridge.EventBridgeWrapper{}
 	if err := json.Unmarshal([]byte(*msg.Body), wrapper); err == nil && wrapper.DetailType != "" {
 		switch wrapper.DetailType {
 		case eventbridge.EventBridgeO5MessageDetailType:

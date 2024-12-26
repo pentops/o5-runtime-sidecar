@@ -2,6 +2,7 @@ package eventbridge
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -22,6 +23,17 @@ const (
 
 type EventBridgeAPI interface {
 	PutEvents(ctx context.Context, params *eventbridge.PutEventsInput, optFns ...func(*eventbridge.Options)) (*eventbridge.PutEventsOutput, error)
+}
+
+type EventBridgeWrapper struct {
+	Detail       json.RawMessage `json:"detail"`
+	DetailType   string          `json:"detail-type"`
+	EventBusName string          `json:"eventBusName"`
+	Source       string          `json:"source"`
+	Account      string          `json:"account"`
+	Region       string          `json:"region"`
+	Resources    []string        `json:"resources"`
+	Time         string          `json:"time"`
 }
 
 type EventBridgePublisher struct {
