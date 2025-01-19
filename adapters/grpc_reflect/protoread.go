@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pentops/j5/codec"
+	codec "github.com/pentops/j5/lib/j5codec"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection/grpc_reflection_v1"
 	"google.golang.org/protobuf/proto"

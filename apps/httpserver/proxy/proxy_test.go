@@ -12,9 +12,9 @@ import (
 	"testing"
 
 	"github.com/gorilla/mux"
-	"github.com/pentops/j5/codec"
 	"github.com/pentops/j5/gen/j5/auth/v1/auth_j5pb"
 	"github.com/pentops/j5/gen/test/foo/v1/foo_testspb"
+	codec "github.com/pentops/j5/lib/j5codec"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/genproto/googleapis/api/httpbody"
 	"google.golang.org/grpc"

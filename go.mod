@@ -19,11 +19,11 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d
 	github.com/pentops/flowtest v0.0.0-20241110231021-42663ac00b63
-	github.com/pentops/j5 v0.0.0-20250102182307-38d2136632f9
+	github.com/pentops/j5 v0.0.0-20250119172451-7a5fb5103413
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
 	github.com/pentops/log.go v0.0.0-20241106053730-7ac2afa77d54
-	github.com/pentops/o5-messaging v0.0.0-20241225175229-572d50427290
-	github.com/pentops/runner v0.0.0-20241117231504-8174ef5b83e7
+	github.com/pentops/o5-messaging v0.0.0-20250117174607-e678e3d6220f
+	github.com/pentops/runner v0.0.0-20250116202335-8635b2a42547
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.9.0
