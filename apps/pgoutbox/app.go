@@ -28,22 +28,27 @@ func NewApps(envConfig OutboxConfig, parser Parser, sender Batcher, pgConfigs pg
 		if err != nil {
 			return nil, fmt.Errorf("creating outbox listener: %w", err)
 		}
+
 		apps = append(apps, app)
 	}
+
 	return apps, nil
 }
 
 func NewApp(conn pgclient.PGConnector, batcher Batcher, parser Parser) (*App, error) {
 	name := conn.Name()
+
 	ll, err := NewListener(conn, batcher, parser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create outbox listener: %w", err)
 	}
 
-	return &App{
+	app := &App{
 		Name:     fmt.Sprintf("outbox-%s", name),
 		Listener: ll,
-	}, nil
+	}
+
+	return app, nil
 }
 
 func (ol *App) Run(ctx context.Context) error {
