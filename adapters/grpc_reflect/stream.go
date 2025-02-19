@@ -16,6 +16,7 @@ type reflStream struct {
 
 func newStream(ctx context.Context, cl grpc_reflection_v1.ServerReflectionClient) (*reflStream, error) {
 	var stream grpc_reflection_v1.ServerReflection_ServerReflectionInfoClient
+
 	for {
 		cc, err := cl.ServerReflectionInfo(ctx)
 		if err == nil {
@@ -35,6 +36,7 @@ func newStream(ctx context.Context, cl grpc_reflection_v1.ServerReflectionClient
 			return nil, ctx.Err()
 		}
 	}
+
 	return &reflStream{
 		stream: stream,
 	}, nil
@@ -44,6 +46,7 @@ func (rs *reflStream) roundTrip(req *grpc_reflection_v1.ServerReflectionRequest)
 	if err := rs.stream.Send(req); err != nil {
 		return nil, err
 	}
+
 	return rs.stream.Recv()
 }
 
@@ -58,10 +61,12 @@ func (rs *reflStream) listServices(_ context.Context) (*grpc_reflection_v1.ListS
 	if err != nil {
 		return nil, err
 	}
+
 	resp := d.GetListServicesResponse()
 	if resp == nil {
 		return nil, errors.New("no list services response")
 	}
+
 	return resp, nil
 }
 
@@ -74,10 +79,12 @@ func (rs *reflStream) fileContainingSymbol(_ context.Context, symbol string) (*g
 	if err != nil {
 		return nil, err
 	}
+
 	resp := d.GetFileDescriptorResponse()
 	if resp == nil {
 		return nil, fmt.Errorf("no file descriptor response for symbol %s", symbol)
 	}
+
 	return resp, nil
 }
 
@@ -90,9 +97,11 @@ func (rs *reflStream) file(_ context.Context, path string) (*grpc_reflection_v1.
 	if err != nil {
 		return nil, err
 	}
+
 	resp := d.GetFileDescriptorResponse()
 	if resp == nil {
 		return nil, fmt.Errorf("no file descriptor response for file %s", path)
 	}
+
 	return resp, nil
 }

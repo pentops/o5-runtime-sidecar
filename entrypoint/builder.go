@@ -35,73 +35,79 @@ type Publisher interface {
 }
 
 func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
-	var err error
-
-	rt := NewRuntime()
-	rt.endpoints = envConfig.ServiceEndpoints
-
 	srcConfig := sidecar.AppInfo{
 		SourceApp:      envConfig.AppName,
 		SourceEnv:      envConfig.EnvironmentName,
 		SidecarVersion: envConfig.SidecarVersion,
 	}
-	rt.msgConverter = msgconvert.NewConverter(srcConfig)
+
+	runtime := NewRuntime()
+	runtime.endpoints = envConfig.ServiceEndpoints
+	runtime.msgConverter = msgconvert.NewConverter(srcConfig)
 
 	if envConfig.EventBridgeConfig.BusARN != "" {
-		rt.sender, err = eventbridge.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeConfig)
+		s, err := eventbridge.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeConfig)
 		if err != nil {
 			return nil, fmt.Errorf("creating eventbridge publisher: %w", err)
 		}
+
+		runtime.sender = s
 	}
 
 	pgConfigs := pgclient.NewConnectorSet(awsConfig, pgclient.EnvProvider{})
 
 	// Listen to a Postgres outbox table
 	if len(envConfig.OutboxConfig.PostgresOutboxURI) > 0 {
-		if rt.sender == nil {
+		if runtime.sender == nil {
 			return nil, fmt.Errorf("outbox requires a sender (set EVENTBRIDGE_ARN)")
 		}
-		apps, err := pgoutbox.NewApps(envConfig.OutboxConfig, rt.msgConverter, rt.sender, pgConfigs)
+
+		a, err := pgoutbox.NewApps(envConfig.OutboxConfig, runtime.msgConverter, runtime.sender, pgConfigs)
 		if err != nil {
 			return nil, fmt.Errorf("creating outbox listener: %w", err)
 		}
-		rt.outboxListeners = append(rt.outboxListeners, apps...)
+
+		runtime.outboxListeners = append(runtime.outboxListeners, a...)
 	}
 
 	// Proxy a Postgres connection, handling IAM auth
 	if len(envConfig.PostgresProxy) > 0 {
-		proxy, err := pgproxy.NewApp(envConfig.ProxyConfig, pgConfigs)
+		p, err := pgproxy.NewApp(envConfig.ProxyConfig, pgConfigs)
 		if err != nil {
 			return nil, fmt.Errorf("creating postgres proxy: %w", err)
 		}
-		rt.postgresProxy = proxy
+
+		runtime.postgresProxy = p
 	}
 
 	// Subscribe to SQS messages
 	if envConfig.WorkerConfig.SQSURL != "" {
-		worker, err := queueworker.NewApp(envConfig.WorkerConfig, srcConfig, rt.sender, awsConfig.SQS())
+		w, err := queueworker.NewApp(envConfig.WorkerConfig, srcConfig, runtime.sender, awsConfig.SQS())
 		if err != nil {
 			return nil, fmt.Errorf("creating queue worker: %w", err)
 		}
-		rt.queueWorker = worker
+
+		runtime.queueWorker = w
 	}
 
 	// Serve an internal gRPC server, for the app to use messaging without an outbox
 	if envConfig.BridgeConfig.AdapterAddr != "" {
-		if rt.sender == nil {
+		if runtime.sender == nil {
 			return nil, fmt.Errorf("bridge requires a sender")
 		}
-		rt.adapter = bridge.NewApp(envConfig.AdapterAddr, rt.sender, rt.msgConverter)
+
+		runtime.adapter = bridge.NewApp(envConfig.AdapterAddr, runtime.sender, runtime.msgConverter)
 	}
 
 	// Serve a public HTTP server
 	if envConfig.PublicAddr != "" {
-		router, err := httpserver.NewRouter(envConfig.ServerConfig, srcConfig)
+		r, err := httpserver.NewRouter(envConfig.ServerConfig, srcConfig)
 		if err != nil {
 			return nil, fmt.Errorf("creating router: %w", err)
 		}
-		rt.routerServer = router
+
+		runtime.routerServer = r
 	}
 
-	return rt, nil
+	return runtime, nil
 }

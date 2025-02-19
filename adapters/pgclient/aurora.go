@@ -49,6 +49,7 @@ func NewCredBuilder(creds aws.CredentialsProvider, region string) *CredBuilder {
 		region:  region,
 		configs: make(map[string]*AuroraConfig),
 	}
+
 	return cb
 }
 
@@ -60,15 +61,18 @@ func fixConfig(config *AuroraConfig) error {
 		}
 	} else if len(parts) == 2 {
 		endpoint, portStr := parts[0], parts[1]
+
 		portInt, err := strconv.Atoi(portStr)
 		if err != nil {
 			return fmt.Errorf("invalid endpoint %s: %w", config.Endpoint, err)
 		}
+
 		if config.Port == 0 {
 			config.Port = portInt
 		} else if config.Port != portInt {
 			return fmt.Errorf("port in endpoint doesn't match specified port")
 		}
+
 		config.Endpoint = endpoint
 	} else {
 		return fmt.Errorf("invalid endpoint %s", config.Endpoint)
@@ -85,7 +89,9 @@ func (cb *CredBuilder) AddConfig(name string, config *AuroraConfig) error {
 	if err := fixConfig(config); err != nil {
 		return err
 	}
+
 	cb.configs[name] = config
+
 	return nil
 }
 
@@ -104,6 +110,7 @@ func (cb *CredBuilder) newToken(ctx context.Context, config *AuroraConfig) (stri
 	if err != nil {
 		return "", fmt.Errorf("failed to create authentication token: %w", err)
 	}
+
 	return authenticationToken, nil
 }
 

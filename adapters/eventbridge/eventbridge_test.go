@@ -22,7 +22,6 @@ func (mock *MockEventBridgeAPI) PutEvents(ctx context.Context, params *eventbrid
 }
 
 func TestEventBridge(t *testing.T) {
-
 	gotEntries := make([]types.PutEventsRequestEntry, 0)
 
 	eventbridgeClient := &MockEventBridgeAPI{
@@ -66,9 +65,11 @@ func TestEventBridge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err.Error())
 	}
+
 	if len(res) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(res))
 	}
+
 	if res[0] != "message-id" {
 		t.Fatalf("expected message-id, got %s", res[0])
 	}

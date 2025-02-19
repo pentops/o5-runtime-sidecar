@@ -35,7 +35,6 @@ func (ta TestAWS) Credentials() aws.CredentialsProvider {
 }
 
 func TestLoader(t *testing.T) {
-
 	runtime, err := FromConfig(Config{}, TestAWS{})
 	assert.NoError(t, err)
 
@@ -43,13 +42,13 @@ func TestLoader(t *testing.T) {
 	if err == nil {
 		t.Error("expected error - nothing configured")
 	}
+
 	if !errors.Is(err, NothingToDoError) {
 		t.Errorf("expected NothingToDoError, got %v", err)
 	}
 }
 
 func TestLoadEverything(t *testing.T) {
-
 	runtime, err := FromConfig(Config{
 		ServerConfig: httpserver.ServerConfig{
 			PublicAddr:  ":0",
