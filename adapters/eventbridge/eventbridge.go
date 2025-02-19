@@ -58,7 +58,11 @@ func (p *EventBridgePublisher) PublisherID() string {
 
 func (p *EventBridgePublisher) Publish(ctx context.Context, message *messaging_pb.Message) error {
 	_, err := p.PublishBatch(ctx, []*messaging_pb.Message{message})
-	return err
+	if err != nil {
+		return fmt.Errorf("failed to publish message: %w", err)
+	}
+
+	return nil
 }
 
 func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*messaging_pb.Message) ([]string, error) {
