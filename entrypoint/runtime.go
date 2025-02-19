@@ -99,9 +99,9 @@ func (rt *Runtime) Run(ctx context.Context) error {
 		return nil
 	})
 
-	for _, outbox := range rt.outboxListeners {
+	for _, o := range rt.outboxListeners {
 		didAnything = true
-		runGroup.Add(outbox.Name, outbox.Run)
+		runGroup.Add(o.Name, o.Run)
 	}
 
 	<-rt.endpointWait
@@ -142,27 +142,29 @@ func (rt *Runtime) connectEndpoint(endpoint string) (*grpc_reflect.ReflectionCli
 }
 
 func (rt *Runtime) registerEndpoint(ctx context.Context, prClient *grpc_reflect.ReflectionClient) error {
-
-	services, err := prClient.FetchServices(ctx)
+	ss, err := prClient.FetchServices(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}
 
-	for _, ss := range services {
-		name := string(ss.FullName())
+	for _, s := range ss {
+		name := string(s.FullName())
+
 		switch {
 		case strings.HasSuffix(name, "Service"), strings.HasSuffix(name, "Sandbox"):
 			if rt.routerServer == nil {
 				return fmt.Errorf("service %s requires a public port", name)
 			}
-			if err := rt.routerServer.RegisterService(ctx, ss, prClient); err != nil {
+
+			if err := rt.routerServer.RegisterService(ctx, s, prClient); err != nil {
 				return fmt.Errorf("register service %s: %w", name, err)
 			}
 		case strings.HasSuffix(name, "Topic"):
 			if rt.queueWorker == nil {
 				return fmt.Errorf("topic %s requires an SQS URL", name)
 			}
-			if err := rt.queueWorker.RegisterService(ctx, ss, prClient); err != nil {
+
+			if err := rt.queueWorker.RegisterService(ctx, s, prClient); err != nil {
 				return fmt.Errorf("register worker %s: %w", name, err)
 			}
 		default:
