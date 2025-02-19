@@ -53,6 +53,7 @@ func (EnvProvider) GetConfig(name string) (string, bool) {
 	if envCreds == "" {
 		return "", false
 	}
+
 	return envCreds, true
 }
 
@@ -68,8 +69,10 @@ func (ss *pgConnSet) direct(name, raw string) (PGConnector, error) {
 	if conn, ok := ss.connectors[name]; ok {
 		return conn, nil
 	}
+
 	conn := NewDirectConnector(name, raw)
 	ss.connectors[name] = conn
+
 	return conn, nil
 }
 
@@ -90,16 +93,18 @@ func (ss *pgConnSet) aurora(name string, config *AuroraConfig) (PGConnector, err
 	if err != nil {
 		return nil, err
 	}
+
 	ss.connectors[name] = conn
+
 	return conn, nil
 }
 
 func (ss *pgConnSet) GetConnector(raw string) (PGConnector, error) {
-
 	name, ok, err := tryParsePGString(raw)
 	if err != nil {
 		return nil, fmt.Errorf("parsing postgres string: %w", err)
 	}
+
 	if ok {
 		// Credentials were passed directly in the env, use as-is
 		return ss.direct(name, raw)
@@ -111,16 +116,20 @@ func (ss *pgConnSet) GetConnector(raw string) (PGConnector, error) {
 
 	envVarName := "DB_CREDS_" + strcase.ToScreamingSnake(raw)
 	dbName := strcase.ToSnake(raw)
+
 	// the Name passed in should be just the DB name with matching env var
 	envCreds := os.Getenv(envVarName)
+
 	if envCreds == "" {
 		// safe to log since the regex makes it very hard to store a password...
 		return nil, fmt.Errorf("no credentials found - expecting $%s", envVarName)
 	}
+
 	_, ok, err = tryParsePGString(envCreds)
 	if err != nil {
 		return nil, fmt.Errorf("parsing postgres string from $%s: %w", envVarName, err)
 	}
+
 	if ok {
 		// use the raw name as the connection name, but the parsed DSN
 		return ss.direct(dbName, envCreds)
@@ -146,10 +155,12 @@ func tryParsePGString(name string) (string, bool, error) {
 		if err != nil {
 			return "", false, fmt.Errorf("parsing URL: %w", err)
 		}
+
 		name := strings.TrimPrefix(pp.Path, "/")
 		if name == "" || strings.Contains(name, "/") {
 			return "", false, fmt.Errorf("no database name in URL")
 		}
+
 		return name, true, nil
 	}
 
@@ -159,10 +170,12 @@ func tryParsePGString(name string) (string, bool, error) {
 			if part == "" {
 				continue
 			}
+
 			kv := strings.Split(part, "=")
 			if len(kv) != 2 {
 				return "", false, fmt.Errorf("invalid key=value pair: %q", part)
 			}
+
 			if kv[0] == "dbname" {
 				return kv[1], true, nil
 			}

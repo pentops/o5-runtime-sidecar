@@ -66,6 +66,7 @@ func (cl *ReflectionClient) FindDescriptorByName(name protoreflect.FullName) (pr
 	if err == nil {
 		return desc, nil
 	}
+
 	if !errors.Is(err, protoregistry.NotFound) {
 		return nil, err
 	}
@@ -84,6 +85,7 @@ func (cl *ReflectionClient) FindDescriptorByName(name protoreflect.FullName) (pr
 	if err != nil {
 		return nil, err
 	}
+
 	return desc, nil
 }
 
@@ -92,10 +94,12 @@ func (cl *ReflectionClient) FindMessageByName(name protoreflect.FullName) (proto
 	if err != nil {
 		return nil, err
 	}
+
 	descMsg, ok := desc.(protoreflect.MessageDescriptor)
 	if !ok {
 		return nil, fmt.Errorf("type %s is not a message", name)
 	}
+
 	return dynamicpb.NewMessageType(descMsg), nil
 }
 
@@ -117,7 +121,6 @@ func (cl *ReflectionClient) fetchAndInclude(name protoreflect.FullName) (protore
 
 // FetchServices fetches the full reflection descriptor of all exposed services from a grpc server
 func (cl *ReflectionClient) FetchServices(ctx context.Context) ([]protoreflect.ServiceDescriptor, error) {
-
 	stream, err := newStream(ctx, cl.reflectionClient)
 	if err != nil {
 		return nil, err
@@ -159,10 +162,13 @@ func (cl *ReflectionClient) FetchServices(ctx context.Context) ([]protoreflect.S
 			if err := proto.Unmarshal(rawFile, file); err != nil {
 				return nil, err
 			}
+
 			if _, ok := fileSet[file.GetName()]; ok {
 				continue
 			}
+
 			fileSet[file.GetName()] = struct{}{}
+
 			for _, serviceInFile := range file.Service {
 				serviceName := fmt.Sprintf("%s.%s", file.GetPackage(), serviceInFile.GetName())
 				servicesAlreadySeen[serviceName] = struct{}{}
@@ -182,7 +188,6 @@ func (cl *ReflectionClient) FetchServices(ctx context.Context) ([]protoreflect.S
 	services := make([]protoreflect.ServiceDescriptor, 0, len(serviceNames))
 
 	for _, serviceName := range serviceNames {
-
 		ssI, err := files.FindDescriptorByName(protoreflect.FullName(serviceName))
 		if err != nil {
 			return nil, err

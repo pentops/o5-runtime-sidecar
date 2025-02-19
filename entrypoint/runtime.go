@@ -159,6 +159,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, prClient *grpc_reflect.
 			if err := rt.routerServer.RegisterService(ctx, s, prClient); err != nil {
 				return fmt.Errorf("register service %s: %w", name, err)
 			}
+
 		case strings.HasSuffix(name, "Topic"):
 			if rt.queueWorker == nil {
 				return fmt.Errorf("topic %s requires an SQS URL", name)
@@ -167,6 +168,7 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, prClient *grpc_reflect.
 			if err := rt.queueWorker.RegisterService(ctx, s, prClient); err != nil {
 				return fmt.Errorf("register worker %s: %w", name, err)
 			}
+
 		default:
 			log.WithField(ctx, "service", name).Error("Unknown service type")
 			// but continue

@@ -43,7 +43,6 @@ func (ll *Converter) ParseMessage(id string, data []byte) (*messaging_pb.Message
 }
 
 func (ll *Converter) ConvertMessage(msg *messaging_pb.Message) (*messaging_pb.Message, error) {
-
 	msg.SourceApp = ll.source.SourceApp
 	msg.SourceEnv = ll.source.SourceEnv
 
@@ -92,10 +91,12 @@ func (ll *Converter) toJ5JSON(body *messaging_pb.Any) (*messaging_pb.Any, error)
 		if err := proto.Unmarshal(body.Value, msg.Interface()); err != nil {
 			return nil, fmt.Errorf("error unmarshalling proto: %w", err)
 		}
+
 	case messaging_pb.WireEncoding_PROTOJSON:
 		if err := protojson.Unmarshal(body.Value, msg.Interface()); err != nil {
 			return nil, fmt.Errorf("error unmarshalling protojson: %w", err)
 		}
+
 	default:
 		return nil, fmt.Errorf("unexpected encoding: %v", body.Encoding)
 	}

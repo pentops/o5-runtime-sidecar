@@ -39,5 +39,6 @@ func (mb *MessageBridge) Send(ctx context.Context, req *messaging_tpb.SendMessag
 	if err := mb.publisher.Publish(ctx, msg); err != nil {
 		return nil, fmt.Errorf("couldn't send marshalled msg: %w", err)
 	}
+
 	return &emptypb.Empty{}, nil
 }

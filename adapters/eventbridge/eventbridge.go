@@ -45,6 +45,7 @@ func NewEventBridgePublisher(client EventBridgeAPI, config EventBridgeConfig) (*
 	if config.BusARN == "" {
 		return nil, fmt.Errorf("missing $EVENTBRIDGE_ARN")
 	}
+
 	return &EventBridgePublisher{
 		client:            client,
 		EventBridgeConfig: config,
@@ -61,7 +62,6 @@ func (p *EventBridgePublisher) Publish(ctx context.Context, message *messaging_p
 }
 
 func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*messaging_pb.Message) ([]string, error) {
-
 	// TODO: Calculate the size of the request, the 'total entry size' must be
 	// less than 256KB
 	// 14 bytes for the Time parameter
@@ -73,6 +73,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 		if err != nil {
 			return nil, err
 		}
+
 		entries[idx] = *entry
 	}
 
@@ -95,9 +96,11 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 				"errorCode":    *entry.ErrorCode,
 				"errorMessage": *entry.ErrorMessage,
 			}).Error("Failed to PutEvent to EventBus")
+
 			if firstError == nil {
 				firstError = fmt.Errorf("failed to send event %s: %s %s", request.MessageId, *entry.ErrorCode, *entry.ErrorMessage)
 			}
+
 			continue
 		}
 
@@ -113,7 +116,6 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 }
 
 func (p *EventBridgePublisher) buildPutEventEntry(input *messaging_pb.Message) (*types.PutEventsRequestEntry, error) {
-
 	// eventbridge requires JSON bodies.
 	detai, err := protojson.Marshal(input)
 	if err != nil {
@@ -130,5 +132,4 @@ func (p *EventBridgePublisher) buildPutEventEntry(input *messaging_pb.Message) (
 	}
 
 	return entry, nil
-
 }

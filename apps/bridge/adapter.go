@@ -27,6 +27,7 @@ func NewApp(bind string, sender Publisher, conv Converter) *App {
 	server := grpc.NewServer()
 	messaging_tpb.RegisterMessageBridgeTopicServer(server, messageBridge)
 	reflection.Register(server)
+
 	return &App{
 		addr:   bind,
 		server: server,
