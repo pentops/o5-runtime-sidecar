@@ -45,16 +45,19 @@ func (ll *Listener) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("getting connection DSN: %w", err)
 	}
+
 	conn, err := pgx.Connect(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to PG: %w", err)
 	}
+
 	for {
 		if err := conn.Ping(ctx); err != nil {
 			log.WithError(ctx, err).Warn("pinging Listener PG")
 			time.Sleep(time.Second)
 			continue
 		}
+
 		log.Info(ctx, "pinging Listener PG OK")
 		break
 	}
@@ -62,30 +65,34 @@ func (ll *Listener) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
 	if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
 		return nil, err
 	}
+
 	return conn, nil
 }
 
 func (ll *Listener) Listen(ctx context.Context) error {
-
 	conn, err := ll.connectAndListen(ctx)
 	if err != nil {
 		return err
 	}
 
-	if err := ll.loopUntilEmpty(ctx, conn, ll.rowsCallback); err != nil {
+	err = ll.loopUntilEmpty(ctx, conn, ll.rowsCallback)
+	if err != nil {
 		return err
 	}
 
 	for {
 		log.Debug(ctx, "waiting for notification")
+
 		_, err := conn.WaitForNotification(ctx)
 		if err != nil {
 			log.WithError(ctx, err).Warn("listener error, reconnecting")
 			conn.Close(ctx)
+
 			newConn, err := ll.connectAndListen(ctx)
 			if err != nil {
 				return err
 			}
+
 			conn = newConn
 			log.Info(ctx, "reconnected to PG")
 		} else {
@@ -119,6 +126,7 @@ func (ll *Listener) parseOutboxMessage(row outboxRow) (*messaging_pb.Message, er
 	if err != nil {
 		return nil, fmt.Errorf("error parsing outbox message: %w", err)
 	}
+
 	return msg, nil
 }
 
@@ -128,11 +136,13 @@ func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn, callback
 	log.Debug(ctx, "loopUntilEmpty")
 	for {
 		log.Debug(ctx, "doPage")
+
 		count, err := ll.doPage(ctx, conn, callback)
 		if err != nil {
 			log.WithError(ctx, err).Error("Error running message page")
 			return fmt.Errorf("error doing page of messages: %w", err)
 		}
+
 		log.WithField(ctx, "count", count).Debug("didPage")
 
 		if count == 0 {
@@ -147,7 +157,6 @@ type outboxRow struct {
 }
 
 func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCallback) (int, error) {
-
 	var count int
 
 	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
@@ -174,19 +183,18 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCal
 
 			var row outboxRow
 
-			if err := rows.Scan(
-				&row.id,
-				&row.message,
-			); err != nil {
+			err := rows.Scan(&row.id, &row.message)
+			if err != nil {
 				return fmt.Errorf("error scanning outbox row: %w", err)
 			}
 
 			msgRows = append(msgRows, row)
-
 		}
+
 		log.WithField(ctx, "count", count).Debug("got outbox messages")
 
-		if err := rows.Err(); err != nil {
+		err = rows.Err()
+		if err != nil {
 			return fmt.Errorf("error in outbox rows: %w", err)
 		}
 
@@ -210,6 +218,7 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCal
 		if rowsAffected != int64(len(successIDs)) {
 			return fmt.Errorf("expected to delete %d rows, but deleted %d", len(successIDs), rowsAffected)
 		}
+
 		return nil
 	}()
 
