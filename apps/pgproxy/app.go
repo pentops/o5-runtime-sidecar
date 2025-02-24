@@ -18,7 +18,6 @@ type App struct {
 }
 
 func NewApp(cfg ProxyConfig, pgConfigs pgclient.ConfigSet) (*App, error) {
-
 	connectors := map[string]pgclient.PGConnector{}
 	for _, rawVar := range cfg.PostgresProxy {
 		conn, err := pgConfigs.GetConnector(rawVar)
@@ -27,6 +26,7 @@ func NewApp(cfg ProxyConfig, pgConfigs pgclient.ConfigSet) (*App, error) {
 		}
 		connectors[conn.Name()] = conn
 	}
+
 	var net string
 	bind := cfg.PostgresProxyBind
 	if strings.HasPrefix(bind, "/") {

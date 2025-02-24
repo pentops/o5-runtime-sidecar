@@ -26,6 +26,7 @@ func NewListener(network, bind string, dbs map[string]pgclient.PGConnector) (*Li
 		if err := os.MkdirAll(filepath.Dir(bind), 0755); err != nil {
 			return nil, fmt.Errorf("failed to create directory for unix socket: %w", err)
 		}
+
 		if err := os.Remove(bind); err != nil && !os.IsNotExist(err) {
 			return nil, fmt.Errorf("failed to remove existing unix socket: %w", err)
 		}
@@ -52,14 +53,17 @@ func (l *Listener) Listen(ctx context.Context) error {
 		ln.Close()
 		log.Debug(ctx, "pgproxy: context done, listener closed")
 	}()
+
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil
 			}
+
 			return err
 		}
+
 		go l.newConn(ctx, conn)
 	}
 }
@@ -67,10 +71,12 @@ func (l *Listener) Listen(ctx context.Context) error {
 func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 	defer clientConn.Close()
 	ctx = log.WithField(ctx, "clientAddr", clientConn.RemoteAddr().String())
+
 	client, err := pgserver.NewBackend(ctx, clientConn)
 	if err != nil {
 		log.WithError(ctx, err).Error("pg proxy handshake failure")
 	}
+
 	log.WithField(ctx, "data", client.Data).Info("client connected")
 	defer client.Close()
 
@@ -106,7 +112,6 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 	if err != nil {
 		log.WithError(ctx, err).Error("pgproxy: error in passthrough")
 	}
-
 }
 
 const TxStatusIdle = 'I'
