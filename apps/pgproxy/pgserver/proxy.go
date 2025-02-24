@@ -47,7 +47,10 @@ func copyFrom[T pgproto3.Message](ctx context.Context, from receiver[T], to send
 			}
 
 			if terminate {
-				// The normal, graceful termination procedure is that the frontend sends a Terminate message and immediately closes the connection. On receipt of this message, the backend closes the connection and terminates.
+				// The normal, graceful termination procedure is that the frontend
+				// sends a Terminate message and immediately closes the connection.
+				// On receipt of this message, the backend closes the connection and
+				// terminates.
 				return ErrTerminate
 			}
 
