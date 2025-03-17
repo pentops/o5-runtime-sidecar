@@ -18,6 +18,7 @@ import (
 )
 
 const RawMessageName = "/o5.messaging.v1.topic.RawMessageTopic/Raw"
+const GenericTopic = "/o5.messaging.v1.topic.GenericMessageTopic/Generic"
 
 type SQSAPI interface {
 	ReceiveMessage(ctx context.Context, input *sqs.ReceiveMessageInput, opts ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
@@ -40,7 +41,8 @@ type Worker struct {
 	deadLetterHandler DeadLetterHandler
 	resendChance      int
 
-	services map[string]Handler
+	handlers        map[string]Handler
+	fallbackHandler Handler
 }
 
 // Is this message is randomly selected based on percent received?
@@ -75,7 +77,7 @@ func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resen
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
-		services:          make(map[string]Handler),
+		handlers:          make(map[string]Handler),
 		deadLetterHandler: deadLetters,
 		resendChance:      resendChance,
 	}
@@ -94,21 +96,28 @@ func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.Serv
 
 func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker AppLink) error {
 	serviceName := method.Parent().(protoreflect.ServiceDescriptor).FullName()
-	ss := &service{
-		requestMessage: method.Input(),
-		fullName:       fmt.Sprintf("/%s/%s", serviceName, method.Name()),
-		invoker:        invoker,
+	fullName := fmt.Sprintf("/%s/%s", serviceName, method.Name())
+
+	if fullName == GenericTopic {
+		log.WithField(ctx, "service", fullName).Info("Registering Generic Fallback")
+		ww.fallbackHandler = &genericHandler{
+			invoker: invoker,
+		}
+
+	} else {
+		log.WithField(ctx, "service", fullName).Info("Registering Worker Service")
+		ss := &service{
+			requestMessage: method.Input(),
+			fullName:       fullName,
+			invoker:        invoker,
+		}
+		ww.handlers[ss.fullName] = ss
 	}
-
-	log.WithField(ctx, "service", ss.fullName).Info("Registering Worker Service")
-
-	ww.services[ss.fullName] = ss
-
 	return nil
 }
 
 func (ww *Worker) RegisterHandler(fullMethod string, handler Handler) {
-	ww.services[fullMethod] = handler
+	ww.handlers[fullMethod] = handler
 }
 
 func (ww *Worker) Run(ctx context.Context) error {
@@ -194,26 +203,30 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		"topic":          parsed.DestinationTopic,
 		"sqs-message-id": msg.MessageId,
 	})
+	log.Debug(ctx, "Message Handler: Begin")
 
 	fullServiceName := fmt.Sprintf("/%s/%s", parsed.GrpcService, parsed.GrpcMethod)
-	handler, ok := ww.services[fullServiceName]
+	handler, ok := ww.handlers[fullServiceName]
 	if !ok {
-		log.Error(ctx, "no handler matched")
-		if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
-			log.Error(ctx, "Error handling message, leaving in queue")
+		if ww.fallbackHandler != nil {
+			log.Debug(ctx, "Message Handler: Using fallback handler")
+			handler = ww.fallbackHandler
+		} else {
+			log.Error(ctx, "no handler matched")
+			if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
+				log.Error(ctx, "Error handling message, leaving in queue")
+				return
+			}
+			err := ww.killMessage(ctx, msg, parsed, fmt.Errorf("no handler for %s", fullServiceName))
+			if err != nil {
+				log.WithField(ctx, "killError", err.Error()).
+					Error("Message Worker: Error killing message, leaving in queue")
+				return
+			}
+			log.Debug(ctx, "Message Handler: Killed")
 			return
 		}
-		err := ww.killMessage(ctx, msg, parsed, fmt.Errorf("no handler for %s", fullServiceName))
-		if err != nil {
-			log.WithField(ctx, "killError", err.Error()).
-				Error("Message Worker: Error killing message, leaving in queue")
-			return
-		}
-		log.Debug(ctx, "Message Handler: Killed")
-		return
 	}
-
-	log.Debug(ctx, "Message Handler: Begin")
 
 	err = handler.HandleMessage(ctx, parsed)
 

@@ -30,7 +30,7 @@ func TestDynamicParse(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	handler, ok := ww.services["/test.v1.FooTopic/Foo"].(*service)
+	handler, ok := ww.handlers["/test.v1.FooTopic/Foo"].(*service)
 	if !ok || handler == nil {
 		t.Fatal("handler is nil")
 	}
@@ -65,7 +65,7 @@ func TestRequestMetadata(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	handler, ok := ww.services["/test.v1.RequestTopic/Request"].(*service)
+	handler, ok := ww.handlers["/test.v1.RequestTopic/Request"].(*service)
 	if !ok || handler == nil {
 		t.Fatal("handler is nil")
 	}

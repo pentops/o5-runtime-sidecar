@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pentops/j5/gen/j5/messaging/v1/messaging_j5pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
 	"google.golang.org/grpc"
@@ -20,6 +21,45 @@ type AppLink interface {
 	JSONToProto(body []byte, msg protoreflect.Message) error
 }
 
+func messageHeader(message *messaging_pb.Message) (metadata.MD, error) {
+	cause := &messaging_j5pb.MessageCauseHeader{
+		MessageId: message.MessageId,
+		SourceApp: message.SourceApp,
+		SourceEnv: message.SourceEnv,
+	}
+	causeJSON, err := protojson.Marshal(cause)
+	if err != nil {
+		return nil, err
+	}
+
+	return metadata.MD{
+		"x-o5-message-id":    []string{message.MessageId},
+		"x-o5-message-cause": []string{string(causeJSON)},
+	}, nil
+
+}
+
+type genericHandler struct {
+	invoker AppLink
+}
+
+func (gh genericHandler) HandleMessage(ctx context.Context, message *messaging_pb.Message) error {
+	protoBody := &messaging_tpb.GenericMessage{
+		Message: message,
+	}
+	requestMetadata, err := messageHeader(message)
+	if err != nil {
+		return fmt.Errorf("failed to create message header: %w", err)
+	}
+	ctx = metadata.NewOutgoingContext(ctx, requestMetadata)
+
+	outputMessage := &emptypb.Empty{}
+
+	// Receive response header
+	var responseHeader metadata.MD
+	return gh.invoker.Invoke(ctx, GenericTopic, protoBody, outputMessage, grpc.Header(&responseHeader))
+}
+
 type service struct {
 	requestMessage protoreflect.MessageDescriptor
 	invoker        AppLink
@@ -33,8 +73,9 @@ func (ss service) HandleMessage(ctx context.Context, message *messaging_pb.Messa
 		return fmt.Errorf("failed to parse message body: %w", err)
 	}
 
-	requestMetadata := metadata.MD{
-		"x-o5-message-id": []string{message.MessageId},
+	requestMetadata, err := messageHeader(message)
+	if err != nil {
+		return fmt.Errorf("failed to create message header: %w", err)
 	}
 	ctx = metadata.NewOutgoingContext(ctx, requestMetadata)
 
