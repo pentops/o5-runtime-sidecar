@@ -62,7 +62,6 @@ func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
 		default:
 			return nil, fmt.Errorf("unknown event-bridge detail type: %s", wrapper.DetailType)
 		}
-
 	}
 
 	// SNS Wrapper
