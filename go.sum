@@ -116,8 +116,8 @@ github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b h1:G+1PIEuGcjc3USD
 github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b/go.mod h1:BRRvQEsgjh/Ym+01bZtP8A04wH53ZwwoVj2xw4Zcp40=
 github.com/pentops/log.go v0.0.0-20250304233315-e0210b7a6dc3 h1:KA7Sit7rxlgdeQPGMmD/7PSnBVwjY50+C4HuWAkV3vU=
 github.com/pentops/log.go v0.0.0-20250304233315-e0210b7a6dc3/go.mod h1:yR34x8aMlvhdGvqgIU4+0MiLjJTKt0vpcgUnVN2nZV4=
-github.com/pentops/o5-messaging v0.0.0-20250317182016-de51c0e702a3 h1:xlKXoYV+A7xFxg1O4HyBSb4/k6hVc+exlEVKeoGXzCc=
-github.com/pentops/o5-messaging v0.0.0-20250317182016-de51c0e702a3/go.mod h1:RuFTVPd7iejyBP+Pj3+Udf8gbv5SYtPFlXCrR0BPgqE=
+github.com/pentops/o5-messaging v0.0.0-20250326164730-71b47c1a3deb h1:QP7BpLTRu3S59a4PePXeABLl4HVEfXtpzVRxTJJ1lAc=
+github.com/pentops/o5-messaging v0.0.0-20250326164730-71b47c1a3deb/go.mod h1:RuFTVPd7iejyBP+Pj3+Udf8gbv5SYtPFlXCrR0BPgqE=
 github.com/pentops/runner v0.0.0-20250116202335-8635b2a42547 h1:PFKl3Fo73gT208bXmeoIsF58QotFhwNSSOK/vGa8b2s=
 github.com/pentops/runner v0.0.0-20250116202335-8635b2a42547/go.mod h1:hzPLosxy6O/1qjLUyt9lzE2M1Re/ASxmrErHbImXgNk=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

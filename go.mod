@@ -22,7 +22,7 @@ require (
 	github.com/pentops/j5 v0.0.0-20250317192930-3df519f037f7
 	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
 	github.com/pentops/log.go v0.0.0-20250304233315-e0210b7a6dc3
-	github.com/pentops/o5-messaging v0.0.0-20250317182016-de51c0e702a3
+	github.com/pentops/o5-messaging v0.0.0-20250326164730-71b47c1a3deb
 	github.com/pentops/runner v0.0.0-20250116202335-8635b2a42547
 	github.com/pressly/goose v2.7.0+incompatible
 	github.com/rs/cors v1.11.0
