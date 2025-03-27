@@ -138,7 +138,7 @@ func TestOutbox(t *testing.T) {
 		}
 		for _, id := range ids {
 			// send a messag
-			_, err = dbConn.Exec("INSERT INTO outbox (id, data, headers) VALUES ($1,$2,$3);", id, "{}", "")
+			_, err = dbConn.Exec("INSERT INTO outbox (id, data, headers, send_after) VALUES ($1,$2,$3,$4);", id, "{}", "", time.Now())
 			if err != nil {
 				t.Fatalf("failed to insert message: %s", err)
 			}

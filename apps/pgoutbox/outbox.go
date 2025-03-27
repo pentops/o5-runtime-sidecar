@@ -165,10 +165,20 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCal
 		return 0, fmt.Errorf("error beginning transaction: %w", err)
 	}
 
+	selectQ := `
+SELECT
+	id,
+	data
+FROM outbox
+WHERE send_after < NOW()
+LIMIT 10
+FOR UPDATE SKIP LOCKED
+`
+
 	var sendError error
 	err = func() error {
 		count = 0
-		rows, err := tx.Query(ctx, "SELECT id, data FROM outbox LIMIT 10 FOR UPDATE SKIP LOCKED")
+		rows, err := tx.Query(ctx, selectQ)
 		if err != nil {
 			return fmt.Errorf("error selecting outbox messages: %w", err)
 		}
