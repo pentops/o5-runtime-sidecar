@@ -139,7 +139,6 @@ func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn, callback
 
 		count, err := ll.doPage(ctx, conn, callback)
 		if err != nil {
-			log.WithError(ctx, err).Error("Error running message page")
 			return fmt.Errorf("error doing page of messages: %w", err)
 		}
 
