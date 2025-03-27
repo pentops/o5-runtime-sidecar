@@ -97,7 +97,6 @@ func emptyDB(t *testing.T) string {
 }
 
 func TestOutbox(t *testing.T) {
-
 	log.DefaultLogger.SetLevel(slog.LevelDebug)
 	dbURL := emptyDB(t)
 	dbConn, err := sql.Open("postgres", dbURL)
@@ -136,6 +135,7 @@ func TestOutbox(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to begin transaction: %s", err)
 		}
+
 		for _, id := range ids {
 			// send a messag
 			_, err = dbConn.Exec("INSERT INTO outbox (id, data, headers, send_after) VALUES ($1,$2,$3,$4);", id, "{}", "", time.Now())
@@ -143,6 +143,7 @@ func TestOutbox(t *testing.T) {
 				t.Fatalf("failed to insert message: %s", err)
 			}
 		}
+
 		_, err = dbConn.Exec("COMMIT")
 		if err != nil {
 			t.Fatalf("failed to commit transaction: %s", err)
@@ -159,8 +160,10 @@ func TestOutbox(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected message: %s", msg.MessageId)
 			}
+
 			delete(want, msg.MessageId)
 		}
+
 		if len(want) > 0 {
 			t.Errorf("missing messages: %v", want)
 		}
@@ -168,18 +171,20 @@ func TestOutbox(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 	sendReceive(uuid.NewString(), uuid.NewString())
+
 	time.Sleep(time.Millisecond * 100)
 	sendReceive(uuid.NewString(), uuid.NewString())
 
 	// boot the listener
 	_, err = dbConn.Exec(`
 		SELECT pg_terminate_backend(pg_stat_activity.pid)
-		FROM pg_stat_activity 
+		FROM pg_stat_activity
 		WHERE pg_stat_activity.datname = $1
 		AND pid <> pg_backend_pid()`, dbName)
 	if err != nil {
 		t.Fatalf("failed to kill connections: %s", err)
 	}
+
 	time.Sleep(time.Millisecond * 100)
 	sendReceive(uuid.NewString(), uuid.NewString())
 
