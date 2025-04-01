@@ -114,7 +114,7 @@ func TestOutbox(t *testing.T) {
 	}
 
 	conv := msgconvert.NewConverter(source)
-	ll, err := NewListener(conn, batcher, conv)
+	ll, err := NewListener(conn, batcher, conv, false)
 	if err != nil {
 		t.Fatalf("failed to create outbox listener: %s", err)
 	}
@@ -137,8 +137,8 @@ func TestOutbox(t *testing.T) {
 		}
 
 		for _, id := range ids {
-			// send a messag
-			_, err = dbConn.Exec("INSERT INTO outbox (id, data, headers, send_after) VALUES ($1,$2,$3,$4);", id, "{}", "", time.Now())
+			// send a message
+			_, err = dbConn.Exec("INSERT INTO outbox (id, data, headers) VALUES ($1,$2,$3);", id, "{}", "")
 			if err != nil {
 				t.Fatalf("failed to insert message: %s", err)
 			}

@@ -3,8 +3,7 @@
 CREATE TABLE IF NOT EXISTS outbox (
 	id uuid PRIMARY KEY,
 	data jsonb NOT NULL,
-	headers text NOT NULL,
-	send_after timestamptz NOT NULL
+	headers text NOT NULL
 );
 
 -- +goose StatementBegin
