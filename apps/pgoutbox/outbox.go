@@ -27,13 +27,15 @@ type Listener struct {
 	connector pgConnector
 	publisher Batcher
 	parser    Parser
+	delayable bool
 }
 
-func NewListener(connector pgConnector, publisher Batcher, parser Parser) (*Listener, error) {
+func NewListener(connector pgConnector, publisher Batcher, parser Parser, delayable bool) (*Listener, error) {
 	return &Listener{
 		connector: connector,
 		publisher: publisher,
 		parser:    parser,
+		delayable: delayable,
 	}, nil
 }
 
