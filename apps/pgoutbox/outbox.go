@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	sq "github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v5"
 	"github.com/pentops/log.go/log"
 
@@ -167,20 +168,26 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCal
 		return 0, fmt.Errorf("error beginning transaction: %w", err)
 	}
 
-	selectQ := `
-SELECT
-	id,
-	data
-FROM outbox
-WHERE send_after < NOW()
-LIMIT 10
-FOR UPDATE SKIP LOCKED
-`
+	q := sq.Select("id", "data").
+		From("outbox").
+		Limit(10).
+		Suffix(" FOR UPDATE SKIP LOCKED").
+		PlaceholderFormat(sq.Dollar)
+
+	if ll.delayable {
+		q = q.Where("send_after < ?", time.Now())
+	}
 
 	var sendError error
 	err = func() error {
 		count = 0
-		rows, err := tx.Query(ctx, selectQ)
+
+		q, a, err := q.ToSql()
+		if err != nil {
+			return fmt.Errorf("error building outbox query: %w", err)
+		}
+
+		rows, err := tx.Query(ctx, q, a...)
 		if err != nil {
 			return fmt.Errorf("error selecting outbox messages: %w", err)
 		}
