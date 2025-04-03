@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +54,10 @@ func (cl *ReflectionClient) Invoke(ctx context.Context, method string, req inter
 
 func (cl *ReflectionClient) JSONToProto(jsonData []byte, msg protoreflect.Message) error {
 	return cl.codec.JSONToProto(jsonData, msg)
+}
+
+func (cl *ReflectionClient) QueryToProto(vals url.Values, msg protoreflect.Message) error {
+	return cl.codec.QueryToProto(vals, msg)
 }
 
 func (cl *ReflectionClient) ProtoToJSON(msg protoreflect.Message) ([]byte, error) {

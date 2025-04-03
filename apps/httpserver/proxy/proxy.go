@@ -7,6 +7,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gorilla/mux"
@@ -44,6 +45,7 @@ type AppConn interface {
 	Invoke(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
 
 	JSONToProto(body []byte, msg protoreflect.Message) error
+	QueryToProto(query url.Values, msg protoreflect.Message) error
 	ProtoToJSON(msg protoreflect.Message) ([]byte, error)
 }
 
@@ -279,23 +281,13 @@ func (mm *grpcMethod) mapRequest(r *http.Request) (protoreflect.Message, error) 
 		}
 	}
 
+	query := r.URL.Query()
 	reqVars := mux.Vars(r)
 	for key, provided := range reqVars {
-		fd := mm.Input.Fields().ByName(protoreflect.Name(key))
-		if fd == nil {
-			// This should not occur, but logging it to the user to help debug.
-			return nil, status.Error(codes.Internal, fmt.Sprintf("unknown path parameter %q", key))
-		}
-		if err := setFieldFromString(mm.AppCon, inputMessage, fd, provided); err != nil {
-			return nil, err
-		}
+		query.Set(key, provided)
 	}
-
-	query := r.URL.Query()
-	for key, values := range query {
-		if err := setFieldFromStrings(mm.AppCon, inputMessage, key, values); err != nil {
-			return nil, err
-		}
+	if err := mm.AppCon.QueryToProto(query, inputMessage); err != nil {
+		return nil, err
 	}
 
 	return inputMessage, nil

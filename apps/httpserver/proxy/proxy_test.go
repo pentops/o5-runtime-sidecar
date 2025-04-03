@@ -269,6 +269,10 @@ func (f *testInvoker) JSONToProto(jsonData []byte, msg protoreflect.Message) err
 	return f.codec.JSONToProto(jsonData, msg)
 }
 
+func (f *testInvoker) QueryToProto(query url.Values, msg protoreflect.Message) error {
+	return f.codec.QueryToProto(query, msg)
+}
+
 func (f *testInvoker) ProtoToJSON(msg protoreflect.Message) ([]byte, error) {
 	return f.codec.ProtoToJSON(msg)
 }

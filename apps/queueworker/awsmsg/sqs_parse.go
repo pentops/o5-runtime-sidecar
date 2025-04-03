@@ -17,8 +17,6 @@ import (
 )
 
 const (
-	// this the the most magic of magic strings, built by the protoc-gen-go
-	// extension for messaging
 	contentTypeAttribute = "Content-Type"
 	serviceAttribute     = "grpc-service"
 	grpcMessageAttribute = "grpc-message"
