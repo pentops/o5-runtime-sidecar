@@ -74,8 +74,10 @@ func NewRouter() *Router {
 			"x-version":  true,
 		},
 		ForwardRequestHeaders: map[string]bool{
-			"cookie": true,
-			"origin": true,
+			"cookie":          true,
+			"origin":          true,
+			"x-forwarded-for": true,
+			"user-agent":      true,
 		},
 	}
 }
