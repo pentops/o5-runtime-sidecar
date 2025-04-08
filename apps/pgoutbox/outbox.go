@@ -107,20 +107,6 @@ func (ll *Listener) Listen(ctx context.Context) error {
 
 }
 
-func (ll *Listener) rowsCallback(ctx context.Context, rows []outboxRow) ([]string, error) {
-	msgs := make([]*messaging_pb.Message, len(rows))
-	for idx, row := range rows {
-		msg, err := ll.parseOutboxMessage(row)
-		if err != nil {
-			return nil, err
-		}
-
-		msgs[idx] = msg
-	}
-
-	return ll.publisher.PublishBatch(ctx, msgs)
-}
-
 func (ll *Listener) parseOutboxMessage(row outboxRow) (*messaging_pb.Message, error) {
 	msg, err := ll.parser.ParseMessage(row.id, row.message)
 	if err != nil {
@@ -129,8 +115,6 @@ func (ll *Listener) parseOutboxMessage(row outboxRow) (*messaging_pb.Message, er
 
 	return msg, nil
 }
-
-type pageCallback func(ctx context.Context, rows []outboxRow) ([]string, error)
 
 func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
 	log.Debug(ctx, "loopUntilEmpty")
