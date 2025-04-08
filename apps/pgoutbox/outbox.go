@@ -75,7 +75,7 @@ func (ll *Listener) Listen(ctx context.Context) error {
 		return err
 	}
 
-	err = ll.loopUntilEmpty(ctx, conn, ll.rowsCallback)
+	err = ll.loopUntilEmpty(ctx, conn)
 	if err != nil {
 		return err
 	}
@@ -99,7 +99,7 @@ func (ll *Listener) Listen(ctx context.Context) error {
 			log.Debug(ctx, "received notification")
 		}
 
-		err = ll.loopUntilEmpty(ctx, conn, ll.rowsCallback)
+		err = ll.loopUntilEmpty(ctx, conn)
 		if err != nil {
 			return err
 		}
@@ -132,12 +132,12 @@ func (ll *Listener) parseOutboxMessage(row outboxRow) (*messaging_pb.Message, er
 
 type pageCallback func(ctx context.Context, rows []outboxRow) ([]string, error)
 
-func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn, callback pageCallback) error {
+func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
 	log.Debug(ctx, "loopUntilEmpty")
 	for {
 		log.Debug(ctx, "doPage")
 
-		count, err := ll.doPage(ctx, conn, callback)
+		count, err := ll.doPage(ctx, conn)
 		if err != nil {
 			log.WithError(ctx, err).Error("Error running message page")
 			return fmt.Errorf("error doing page of messages: %w", err)
@@ -156,7 +156,7 @@ type outboxRow struct {
 	message []byte
 }
 
-func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCallback) (int, error) {
+func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 	var count int
 
 	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
@@ -203,7 +203,18 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn, callback pageCal
 		}
 
 		var successIDs []string
-		successIDs, sendError = callback(ctx, msgRows)
+
+		msgs := make([]*messaging_pb.Message, len(msgRows))
+		for idx, row := range msgRows {
+			msg, err := ll.parseOutboxMessage(row)
+			if err != nil {
+				return err
+			}
+
+			msgs[idx] = msg
+		}
+
+		successIDs, sendError = ll.publisher.PublishBatch(ctx, msgs)
 		// NOTE: sendError is handled at the end, the transaction should still be
 		// committed.
 
