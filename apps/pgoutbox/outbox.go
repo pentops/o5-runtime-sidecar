@@ -26,27 +26,27 @@ type pgConnector interface {
 	DSN(ctx context.Context) (string, error)
 }
 
-type Listener struct {
+type Outbox struct {
 	connector pgConnector
 	publisher Batcher
 	parser    Parser
 }
 
-func NewListener(connector pgConnector, publisher Batcher, parser Parser) (*Listener, error) {
-	return &Listener{
+func NewOutbox(connector pgConnector, publisher Batcher, parser Parser) (*Outbox, error) {
+	return &Outbox{
 		connector: connector,
 		publisher: publisher,
 		parser:    parser,
 	}, nil
 }
 
-func (ll *Listener) Listen(ctx context.Context) error {
-	conn, err := ll.connectAndListen(ctx)
+func (o *Outbox) Listen(ctx context.Context) error {
+	conn, err := o.connectAndListen(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = ll.loopUntilEmpty(ctx, conn)
+	err = o.loopUntilEmpty(ctx, conn)
 	if err != nil {
 		return err
 	}
@@ -59,7 +59,7 @@ func (ll *Listener) Listen(ctx context.Context) error {
 			log.WithError(ctx, err).Warn("listener error, reconnecting")
 			conn.Close(ctx)
 
-			newConn, err := ll.connectAndListen(ctx)
+			newConn, err := o.connectAndListen(ctx)
 			if err != nil {
 				return err
 			}
@@ -70,18 +70,18 @@ func (ll *Listener) Listen(ctx context.Context) error {
 			log.Debug(ctx, "received notification")
 		}
 
-		err = ll.loopUntilEmpty(ctx, conn)
+		err = o.loopUntilEmpty(ctx, conn)
 		if err != nil {
 			return err
 		}
 	}
 }
 
-func (ll *Listener) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
+func (o *Outbox) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
 	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
-	dsn, err := ll.connector.DSN(dialContext)
+	dsn, err := o.connector.DSN(dialContext)
 	if err != nil {
 		return nil, fmt.Errorf("getting connection DSN: %w", err)
 	}
@@ -109,12 +109,12 @@ func (ll *Listener) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
 	return conn, nil
 }
 
-func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
+func (o *Outbox) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
 	log.Debug(ctx, "loopUntilEmpty")
 	for {
 		log.Debug(ctx, "doPage")
 
-		count, err := ll.doPage(ctx, conn)
+		count, err := o.doPage(ctx, conn)
 		if err != nil {
 			log.WithError(ctx, err).Error("Error running message page")
 			return fmt.Errorf("error doing page of messages: %w", err)
@@ -128,7 +128,7 @@ func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
 	}
 }
 
-func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
+func (o *Outbox) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 	var count int
 
 	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
@@ -138,7 +138,7 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 		return 0, fmt.Errorf("error beginning transaction: %w", err)
 	}
 
-	bErr := ll.doBatch(ctx, tx)
+	bErr := o.doBatch(ctx, tx)
 	if bErr != nil && !errors.Is(bErr, SendErr) {
 		_ = tx.Rollback(ctx)
 		return 0, bErr
@@ -161,7 +161,7 @@ type outboxRow struct {
 	message []byte
 }
 
-func (ll *Listener) doBatch(ctx context.Context, tx pgx.Tx) error {
+func (o *Outbox) doBatch(ctx context.Context, tx pgx.Tx) error {
 	count := 0
 	rows, err := tx.Query(ctx, "SELECT id, data FROM outbox LIMIT 10 FOR UPDATE SKIP LOCKED")
 	if err != nil {
@@ -198,7 +198,7 @@ func (ll *Listener) doBatch(ctx context.Context, tx pgx.Tx) error {
 
 	msgs := make([]*messaging_pb.Message, len(msgRows))
 	for idx, row := range msgRows {
-		msg, err := ll.parser.ParseMessage(row.id, row.message)
+		msg, err := o.parser.ParseMessage(row.id, row.message)
 		if err != nil {
 			return fmt.Errorf("error parsing outbox message: %w", err)
 		}
@@ -207,7 +207,7 @@ func (ll *Listener) doBatch(ctx context.Context, tx pgx.Tx) error {
 	}
 
 	// NOTE: this err is handled at the end to allow adding deletion of successful messages to the tx
-	successIDs, delayedErr := ll.publisher.PublishBatch(ctx, msgs)
+	successIDs, delayedErr := o.publisher.PublishBatch(ctx, msgs)
 
 	log.WithField(ctx, "successCount", len(successIDs)).Debug("published outbox messages")
 
