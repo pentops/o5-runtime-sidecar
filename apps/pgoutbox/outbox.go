@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	sq "github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v5"
 	"github.com/pentops/log.go/log"
 
@@ -162,8 +163,19 @@ type outboxRow struct {
 }
 
 func (o *Outbox) doBatch(ctx context.Context, tx pgx.Tx) error {
+	s := sq.Select("id", "data").
+		From("outbox").
+		Limit(10).
+		Suffix(" FOR UPDATE SKIP LOCKED").
+		PlaceholderFormat(sq.Dollar)
+
+	q, a, err := s.ToSql()
+	if err != nil {
+		return fmt.Errorf("error building outbox query: %w", err)
+	}
+
 	count := 0
-	rows, err := tx.Query(ctx, "SELECT id, data FROM outbox LIMIT 10 FOR UPDATE SKIP LOCKED")
+	rows, err := tx.Query(ctx, q, a...)
 	if err != nil {
 		return fmt.Errorf("error selecting outbox messages: %w", err)
 	}
