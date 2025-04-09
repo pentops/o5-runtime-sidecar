@@ -62,8 +62,12 @@ func (o *Outbox) Run(ctx context.Context) error {
 }
 
 func (o *Outbox) Listen(ctx context.Context) error {
-	conn, err := o.connectAndListen(ctx)
+	conn, err := o.connect(ctx)
 	if err != nil {
+		return err
+	}
+
+	if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
 		return err
 	}
 
@@ -80,12 +84,17 @@ func (o *Outbox) Listen(ctx context.Context) error {
 			log.WithError(ctx, err).Warn("listener error, reconnecting")
 			conn.Close(ctx)
 
-			newConn, err := o.connectAndListen(ctx)
+			newConn, err := o.connect(ctx)
 			if err != nil {
 				return err
 			}
 
 			conn = newConn
+
+			if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
+				return err
+			}
+
 			log.Info(ctx, "reconnected to PG")
 		} else {
 			log.Debug(ctx, "received notification")
@@ -98,7 +107,7 @@ func (o *Outbox) Listen(ctx context.Context) error {
 	}
 }
 
-func (o *Outbox) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
+func (o *Outbox) connect(ctx context.Context) (*pgx.Conn, error) {
 	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 
@@ -114,17 +123,13 @@ func (o *Outbox) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
 
 	for {
 		if err := conn.Ping(ctx); err != nil {
-			log.WithError(ctx, err).Warn("pinging Listener PG")
+			log.WithError(ctx, err).Warn("pinging PG")
 			time.Sleep(time.Second)
 			continue
 		}
 
-		log.Info(ctx, "pinging Listener PG OK")
+		log.Info(ctx, "pinging PG OK")
 		break
-	}
-
-	if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
-		return nil, err
 	}
 
 	return conn, nil
