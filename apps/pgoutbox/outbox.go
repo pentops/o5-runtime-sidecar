@@ -108,15 +108,6 @@ func (ll *Listener) Listen(ctx context.Context) error {
 
 }
 
-func (ll *Listener) parseOutboxMessage(row outboxRow) (*messaging_pb.Message, error) {
-	msg, err := ll.parser.ParseMessage(row.id, row.message)
-	if err != nil {
-		return nil, fmt.Errorf("error parsing outbox message: %w", err)
-	}
-
-	return msg, nil
-}
-
 func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
 	log.Debug(ctx, "loopUntilEmpty")
 	for {
@@ -208,9 +199,9 @@ func (ll *Listener) doBatch(ctx context.Context, tx pgx.Tx) error {
 
 	msgs := make([]*messaging_pb.Message, len(msgRows))
 	for idx, row := range msgRows {
-		msg, err := ll.parseOutboxMessage(row)
+		msg, err := ll.parser.ParseMessage(row.id, row.message)
 		if err != nil {
-			return err
+			return fmt.Errorf("error parsing outbox message: %w", err)
 		}
 
 		msgs[idx] = msg
