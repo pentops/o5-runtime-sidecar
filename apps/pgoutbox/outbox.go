@@ -12,6 +12,8 @@ import (
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 )
 
+var SendErr = errors.New("error sending batch of outbox messages")
+
 type Batcher interface {
 	PublishBatch(ctx context.Context, messages []*messaging_pb.Message) ([]string, error)
 }
@@ -36,38 +38,6 @@ func NewListener(connector pgConnector, publisher Batcher, parser Parser) (*List
 		publisher: publisher,
 		parser:    parser,
 	}, nil
-}
-
-func (ll *Listener) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
-	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-
-	dsn, err := ll.connector.DSN(dialContext)
-	if err != nil {
-		return nil, fmt.Errorf("getting connection DSN: %w", err)
-	}
-
-	conn, err := pgx.Connect(ctx, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to PG: %w", err)
-	}
-
-	for {
-		if err := conn.Ping(ctx); err != nil {
-			log.WithError(ctx, err).Warn("pinging Listener PG")
-			time.Sleep(time.Second)
-			continue
-		}
-
-		log.Info(ctx, "pinging Listener PG OK")
-		break
-	}
-
-	if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
-		return nil, err
-	}
-
-	return conn, nil
 }
 
 func (ll *Listener) Listen(ctx context.Context) error {
@@ -105,7 +75,38 @@ func (ll *Listener) Listen(ctx context.Context) error {
 			return err
 		}
 	}
+}
 
+func (ll *Listener) connectAndListen(ctx context.Context) (*pgx.Conn, error) {
+	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+
+	dsn, err := ll.connector.DSN(dialContext)
+	if err != nil {
+		return nil, fmt.Errorf("getting connection DSN: %w", err)
+	}
+
+	conn, err := pgx.Connect(ctx, dsn)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to PG: %w", err)
+	}
+
+	for {
+		if err := conn.Ping(ctx); err != nil {
+			log.WithError(ctx, err).Warn("pinging Listener PG")
+			time.Sleep(time.Second)
+			continue
+		}
+
+		log.Info(ctx, "pinging Listener PG OK")
+		break
+	}
+
+	if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
+		return nil, err
+	}
+
+	return conn, nil
 }
 
 func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
@@ -126,13 +127,6 @@ func (ll *Listener) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
 		}
 	}
 }
-
-type outboxRow struct {
-	id      string
-	message []byte
-}
-
-var SendErr = errors.New("error sending batch of outbox messages")
 
 func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 	var count int
@@ -160,6 +154,11 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 	}
 
 	return count, nil
+}
+
+type outboxRow struct {
+	id      string
+	message []byte
 }
 
 func (ll *Listener) doBatch(ctx context.Context, tx pgx.Tx) error {
