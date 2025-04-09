@@ -9,6 +9,7 @@ import (
 	sq "github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v5"
 	"github.com/pentops/log.go/log"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 )
@@ -39,6 +40,25 @@ func NewOutbox(connector pgConnector, publisher Batcher, parser Parser) (*Outbox
 		publisher: publisher,
 		parser:    parser,
 	}, nil
+}
+
+func (o *Outbox) Run(ctx context.Context) error {
+	group, ctx := errgroup.WithContext(ctx)
+
+	group.Go(func() error {
+		log.Info(ctx, "starting outbox listener")
+
+		err := o.Listen(ctx)
+		if err != nil {
+			return fmt.Errorf("error listening for outbox messages: %w", err)
+		}
+
+		log.Info(ctx, "stopping outbox listener")
+
+		return nil
+	})
+
+	return group.Wait()
 }
 
 func (o *Outbox) Listen(ctx context.Context) error {

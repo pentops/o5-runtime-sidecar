@@ -132,15 +132,15 @@ func TestOutbox(t *testing.T) {
 		t.Fatalf("failed to create outbox listener: %s", err)
 	}
 
-	chListener := make(chan error)
+	runErr := make(chan error)
 
 	outboxCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go func() {
-		err := o.Listen(outboxCtx)
+		err := o.Run(outboxCtx)
 		t.Logf("outbox exited: %s", err)
-		chListener <- err
+		runErr <- err
 	}()
 
 	sendReceive := func(ids ...string) {
@@ -202,7 +202,7 @@ func TestOutbox(t *testing.T) {
 	sendReceive(uuid.NewString(), uuid.NewString())
 
 	cancel()
-	if err := <-chListener; err != nil {
+	if err := <-runErr; err != nil {
 		if !errors.Is(err, context.Canceled) {
 			t.Errorf("listener error: %s ", err)
 		}

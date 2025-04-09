@@ -52,5 +52,5 @@ func NewApp(conn pgclient.PGConnector, batcher Batcher, parser Parser) (*App, er
 }
 
 func (a *App) Run(ctx context.Context) error {
-	return a.Outbox.Listen(ctx)
+	return a.Outbox.Run(ctx)
 }
