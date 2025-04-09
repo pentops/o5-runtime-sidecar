@@ -2,6 +2,7 @@ package pgoutbox
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -140,6 +141,8 @@ type outboxRow struct {
 	message []byte
 }
 
+var SendErr = errors.New("error sending batch of outbox messages")
+
 func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 	var count int
 
@@ -150,76 +153,10 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 		return 0, fmt.Errorf("error beginning transaction: %w", err)
 	}
 
-	var sendError error
-	err = func() error {
-		count = 0
-		rows, err := tx.Query(ctx, "SELECT id, data FROM outbox LIMIT 10 FOR UPDATE SKIP LOCKED")
-		if err != nil {
-			return fmt.Errorf("error selecting outbox messages: %w", err)
-		}
-
-		defer rows.Close()
-
-		msgRows := []outboxRow{}
-
-		for rows.Next() {
-			count++
-
-			var row outboxRow
-
-			err := rows.Scan(&row.id, &row.message)
-			if err != nil {
-				return fmt.Errorf("error scanning outbox row: %w", err)
-			}
-
-			msgRows = append(msgRows, row)
-		}
-
-		log.WithField(ctx, "count", count).Debug("got outbox messages")
-
-		err = rows.Err()
-		if err != nil {
-			return fmt.Errorf("error in outbox rows: %w", err)
-		}
-
-		if count == 0 {
-			return nil
-		}
-
-		var successIDs []string
-
-		msgs := make([]*messaging_pb.Message, len(msgRows))
-		for idx, row := range msgRows {
-			msg, err := ll.parseOutboxMessage(row)
-			if err != nil {
-				return err
-			}
-
-			msgs[idx] = msg
-		}
-
-		successIDs, sendError = ll.publisher.PublishBatch(ctx, msgs)
-		// NOTE: sendError is handled at the end, the transaction should still be
-		// committed.
-
-		log.WithField(ctx, "successCount", len(successIDs)).Debug("published outbox messages")
-
-		res, deleteError := tx.Exec(ctx, "DELETE FROM outbox WHERE id = ANY($1)", successIDs)
-		if deleteError != nil {
-			return fmt.Errorf("error deleting sent outbox messages: %w", deleteError)
-		}
-
-		rowsAffected := res.RowsAffected()
-		if rowsAffected != int64(len(successIDs)) {
-			return fmt.Errorf("expected to delete %d rows, but deleted %d", len(successIDs), rowsAffected)
-		}
-
-		return nil
-	}()
-
-	if err != nil {
+	bErr := ll.doBatch(ctx, tx)
+	if bErr != nil && !errors.Is(bErr, SendErr) {
 		_ = tx.Rollback(ctx)
-		return 0, err
+		return 0, bErr
 	}
 
 	err = tx.Commit(ctx)
@@ -227,9 +164,77 @@ func (ll *Listener) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
 		return 0, fmt.Errorf("error committing transaction: %w", err)
 	}
 
-	if sendError != nil {
-		return 0, fmt.Errorf("error sending batch of outbox messages: %w", sendError)
+	if errors.Is(bErr, SendErr) {
+		return 0, fmt.Errorf("error sending batch of outbox messages: %w", bErr)
 	}
 
 	return count, nil
+}
+
+func (ll *Listener) doBatch(ctx context.Context, tx pgx.Tx) error {
+	count := 0
+	rows, err := tx.Query(ctx, "SELECT id, data FROM outbox LIMIT 10 FOR UPDATE SKIP LOCKED")
+	if err != nil {
+		return fmt.Errorf("error selecting outbox messages: %w", err)
+	}
+
+	defer rows.Close()
+
+	msgRows := []outboxRow{}
+
+	for rows.Next() {
+		count++
+
+		var row outboxRow
+
+		err := rows.Scan(&row.id, &row.message)
+		if err != nil {
+			return fmt.Errorf("error scanning outbox row: %w", err)
+		}
+
+		msgRows = append(msgRows, row)
+	}
+
+	log.WithField(ctx, "count", count).Debug("got outbox messages")
+
+	err = rows.Err()
+	if err != nil {
+		return fmt.Errorf("error in outbox rows: %w", err)
+	}
+
+	if count == 0 {
+		return nil
+	}
+
+	msgs := make([]*messaging_pb.Message, len(msgRows))
+	for idx, row := range msgRows {
+		msg, err := ll.parseOutboxMessage(row)
+		if err != nil {
+			return err
+		}
+
+		msgs[idx] = msg
+	}
+
+	// NOTE: this err is handled at the end to allow adding deletion of successful messages to the tx
+	successIDs, delayedErr := ll.publisher.PublishBatch(ctx, msgs)
+
+	log.WithField(ctx, "successCount", len(successIDs)).Debug("published outbox messages")
+
+	res, err := tx.Exec(ctx, "DELETE FROM outbox WHERE id = ANY($1)", successIDs)
+	if err != nil {
+		return fmt.Errorf("error deleting sent outbox messages: %w", err)
+	}
+
+	rowsAffected := res.RowsAffected()
+	if rowsAffected != int64(len(successIDs)) {
+		return fmt.Errorf("expected to delete %d rows, but deleted %d", len(successIDs), rowsAffected)
+	}
+
+	if delayedErr != nil {
+		// mark as a send error so the caller can decide whether to commit or not
+		return fmt.Errorf("%w: %w", SendErr, delayedErr)
+	}
+
+	return nil
 }
