@@ -34,9 +34,10 @@ type Outbox struct {
 	connector pgConnector
 	publisher Batcher
 	parser    Parser
+	delayable bool
 }
 
-func NewOutbox(connector pgConnector, publisher Batcher, parser Parser) (*Outbox, error) {
+func NewOutbox(connector pgConnector, publisher Batcher, parser Parser, delayable bool) (*Outbox, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
@@ -63,6 +64,7 @@ func NewOutbox(connector pgConnector, publisher Batcher, parser Parser) (*Outbox
 		connector: connector,
 		publisher: publisher,
 		parser:    parser,
+		delayable: delayable,
 	}, nil
 }
 
@@ -95,6 +97,19 @@ func (o *Outbox) Run(ctx context.Context) error {
 
 		return nil
 	})
+
+	if o.delayable {
+		group.Go(func() error {
+			log.Info(ctx, "starting outbox poller")
+
+			err := o.poll(ctx)
+			if err != nil {
+				return fmt.Errorf("outbox: run: %w", err)
+			}
+
+			return nil
+		})
+	}
 
 	return group.Wait()
 }
@@ -198,6 +213,10 @@ func (o *Outbox) doBatch(ctx context.Context, tx pgx.Tx) error {
 		Limit(10).
 		Suffix(" FOR UPDATE SKIP LOCKED").
 		PlaceholderFormat(sq.Dollar)
+
+	if o.delayable {
+		s = s.Where("send_after < ?", time.Now())
+	}
 
 	q, a, err := s.ToSql()
 	if err != nil {
