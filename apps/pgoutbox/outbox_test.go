@@ -2,22 +2,22 @@ package pgoutbox
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-runtime-sidecar/adapters/msgconvert"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
-	"github.com/pressly/goose"
+	"github.com/pressly/goose/v3"
 
-	"github.com/lib/pq"
-	_ "github.com/lib/pq"
 	"github.com/pentops/log.go/log"
 )
 
@@ -52,56 +52,68 @@ var _ pgConnector = testConnector{}
 
 const dbName = "test_outbox_24564546765"
 
-func emptyDB(t *testing.T) string {
-
+func emptyDB(ctx context.Context, t *testing.T, name string) *pgx.ConnConfig {
 	dbURL := os.Getenv("TEST_DB")
 	if !strings.Contains(dbURL, "test") {
 		t.Fatal("TEST_DB not a test database, it must contain the word 'test' somewhere in the connection string")
 	}
 
-	dbConn, err := sql.Open("postgres", dbURL)
-	if err != nil {
-		t.Fatalf("failed to connect to db: %s", err)
-	}
-	defer dbConn.Close() // nolint: errcheck
-
-	parsed, err := pq.ParseURL(dbURL)
+	u, err := url.Parse(dbURL)
 	if err != nil {
 		t.Fatalf("failed to parse db url: %s", err)
 	}
 
-	parts := strings.Split(parsed, " ")
-	for idx, part := range parts {
-		kvParts := strings.Split(part, "=")
-		if len(kvParts) != 2 {
-			t.Fatalf("invalid key value pair: %s", part)
-		}
-		if kvParts[0] == "dbname" {
-			kvParts[1] = dbName
-		}
-		parts[idx] = strings.Join(kvParts, "=")
+	conf, err := pgx.ParseConfig(u.String())
+	if err != nil {
+		t.Fatalf("failed to parse db url: %s", err)
 	}
-	newURL := strings.Join(parts, " ")
 
-	_, err = dbConn.Exec("DROP DATABASE " + dbName)
+	conn, err := pgx.ConnectConfig(ctx, conf)
+	if err != nil {
+		t.Fatalf("failed to connect to db: %s", err)
+	}
+	defer conn.Close(ctx)
+
+	_, err = conn.Exec(ctx, "DROP DATABASE "+name)
 	if err != nil {
 		t.Logf("failed to drop test database: %s", err)
 	}
 
-	_, err = dbConn.Exec("CREATE DATABASE " + dbName)
+	_, err = conn.Exec(ctx, "CREATE DATABASE "+name)
 	if err != nil {
 		t.Fatalf("failed to create test database: %s", err)
 	}
 
-	return newURL
+	// Update the database name in the URL
+	u.Path = name
+
+	newConf, err := pgx.ParseConfig(u.String())
+	if err != nil {
+		t.Fatalf("failed to parse new db url: %s", err)
+	}
+
+	return newConf
 }
 
 func TestOutbox(t *testing.T) {
-
 	log.DefaultLogger.SetLevel(slog.LevelDebug)
-	dbURL := emptyDB(t)
-	dbConn, err := sql.Open("postgres", dbURL)
-	if err := goose.Up(dbConn, "./testdata/db"); err != nil {
+
+	ctx := context.Background()
+
+	dbconf := emptyDB(ctx, t, dbName)
+
+	dbConn, err := pgx.ConnectConfig(ctx, dbconf)
+	if err != nil {
+		t.Fatalf("failed to connect to db: %s", err)
+	}
+	defer dbConn.Close(ctx)
+
+	sql, err := goose.OpenDBWithDriver("pgx", dbconf.ConnString())
+	if err != nil {
+		t.Fatalf("failed to open db: %s", err)
+	}
+
+	if err := goose.Up(sql, "./testdata/db"); err != nil {
 		t.Fatal(err.Error())
 	}
 
@@ -111,39 +123,41 @@ func TestOutbox(t *testing.T) {
 	}
 
 	conn := testConnector{
-		dsn: dbURL,
+		dsn: dbconf.ConnString(),
 	}
 
 	conv := msgconvert.NewConverter(source)
-	ll, err := NewListener(conn, batcher, conv)
+	o, err := NewListener(conn, batcher, conv)
 	if err != nil {
 		t.Fatalf("failed to create outbox listener: %s", err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	chListener := make(chan error)
 
+	outboxCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	go func() {
-		err := ll.Listen(ctx)
-		t.Logf("listener exited: %s", err)
+		err := o.Listen(outboxCtx)
+		t.Logf("outbox exited: %s", err)
 		chListener <- err
 	}()
 
 	sendReceive := func(ids ...string) {
-		_, err = dbConn.Exec("BEGIN")
+		_, err = dbConn.Exec(ctx, "BEGIN")
 		if err != nil {
 			t.Fatalf("failed to begin transaction: %s", err)
 		}
+
 		for _, id := range ids {
-			// send a messag
-			_, err = dbConn.Exec("INSERT INTO outbox (id, data, headers) VALUES ($1,$2,$3);", id, "{}", "")
+			// send a message
+			_, err = dbConn.Exec(ctx, "INSERT INTO outbox (id, data, headers) VALUES ($1,$2,$3);", id, "{}", "")
 			if err != nil {
 				t.Fatalf("failed to insert message: %s", err)
 			}
 		}
-		_, err = dbConn.Exec("COMMIT")
+
+		_, err = dbConn.Exec(ctx, "COMMIT")
 		if err != nil {
 			t.Fatalf("failed to commit transaction: %s", err)
 		}
@@ -159,8 +173,10 @@ func TestOutbox(t *testing.T) {
 			if !ok {
 				t.Errorf("unexpected message: %s", msg.MessageId)
 			}
+
 			delete(want, msg.MessageId)
 		}
+
 		if len(want) > 0 {
 			t.Errorf("missing messages: %v", want)
 		}
@@ -168,18 +184,20 @@ func TestOutbox(t *testing.T) {
 
 	time.Sleep(time.Millisecond * 100)
 	sendReceive(uuid.NewString(), uuid.NewString())
+
 	time.Sleep(time.Millisecond * 100)
 	sendReceive(uuid.NewString(), uuid.NewString())
 
 	// boot the listener
-	_, err = dbConn.Exec(`
-		SELECT pg_terminate_backend(pg_stat_activity.pid)
-		FROM pg_stat_activity 
-		WHERE pg_stat_activity.datname = $1
-		AND pid <> pg_backend_pid()`, dbName)
+	_, err = dbConn.Exec(ctx, `
+			SELECT pg_terminate_backend(pg_stat_activity.pid)
+			FROM pg_stat_activity
+			WHERE pg_stat_activity.datname = $1
+			AND pid <> pg_backend_pid()`, dbName)
 	if err != nil {
 		t.Fatalf("failed to kill connections: %s", err)
 	}
+
 	time.Sleep(time.Millisecond * 100)
 	sendReceive(uuid.NewString(), uuid.NewString())
 
