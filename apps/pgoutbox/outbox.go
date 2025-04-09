@@ -8,6 +8,7 @@ import (
 
 	sq "github.com/elgris/sqrl"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pentops/log.go/log"
 	"golang.org/x/sync/errgroup"
 
@@ -29,13 +30,36 @@ type pgConnector interface {
 }
 
 type Outbox struct {
+	pool      *pgxpool.Pool
 	connector pgConnector
 	publisher Batcher
 	parser    Parser
 }
 
 func NewOutbox(connector pgConnector, publisher Batcher, parser Parser) (*Outbox, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+
+	dsn, err := connector.DSN(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting connection DSN: %w", err)
+	}
+
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, fmt.Errorf("parsing config: %w", err)
+	}
+
+	cfg.MinConns = 1
+	cfg.MaxConns = 3
+
+	pool, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating pool: %w", err)
+	}
+
 	return &Outbox{
+		pool:      pool,
 		connector: connector,
 		publisher: publisher,
 		parser:    parser,
@@ -43,14 +67,28 @@ func NewOutbox(connector pgConnector, publisher Batcher, parser Parser) (*Outbox
 }
 
 func (o *Outbox) Run(ctx context.Context) error {
+	log.Info(ctx, "waiting for db")
+	err := o.waitForDB(ctx)
+	if err != nil {
+		return fmt.Errorf("outbox: waiting for db: %w", err)
+	}
+	log.Info(ctx, "db is ready")
+
+	log.Info(ctx, "processing pending messages on outbox startup")
+	err = o.oneShot(ctx)
+	if err != nil {
+		return fmt.Errorf("outbox: one shot: %w", err)
+	}
+
+	log.Info(ctx, "starting outbox workers")
 	group, ctx := errgroup.WithContext(ctx)
 
 	group.Go(func() error {
 		log.Info(ctx, "starting outbox listener")
 
-		err := o.Listen(ctx)
+		err := o.listen(ctx)
 		if err != nil {
-			return fmt.Errorf("error listening for outbox messages: %w", err)
+			return fmt.Errorf("outbox: listen: %w", err)
 		}
 
 		log.Info(ctx, "stopping outbox listener")
@@ -61,88 +99,55 @@ func (o *Outbox) Run(ctx context.Context) error {
 	return group.Wait()
 }
 
-func (o *Outbox) Listen(ctx context.Context) error {
-	conn, err := o.connect(ctx)
+func (o *Outbox) oneShot(ctx context.Context) error {
+	conn, err := o.pool.Acquire(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("acquiring connection: %w", err)
 	}
-
-	if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
-		return err
-	}
+	defer conn.Release()
 
 	err = o.loopUntilEmpty(ctx, conn)
 	if err != nil {
 		return err
 	}
 
-	for {
-		log.Debug(ctx, "waiting for notification")
+	return nil
+}
 
-		_, err := conn.WaitForNotification(ctx)
-		if err != nil {
-			log.WithError(ctx, err).Warn("listener error, reconnecting")
-			conn.Close(ctx)
+func (o *Outbox) waitForDB(ctx context.Context) error {
+	done := make(chan struct{})
 
-			newConn, err := o.connect(ctx)
-			if err != nil {
-				return err
+	go func() {
+		for {
+			if err := o.pool.Ping(ctx); err != nil {
+				log.WithError(ctx, err).Warn("pinging db")
+				time.Sleep(time.Second)
+				continue
 			}
 
-			conn = newConn
-
-			if _, err := conn.Exec(ctx, "LISTEN outboxmessage"); err != nil {
-				return err
-			}
-
-			log.Info(ctx, "reconnected to PG")
-		} else {
-			log.Debug(ctx, "received notification")
+			done <- struct{}{}
 		}
+	}()
 
-		err = o.loopUntilEmpty(ctx, conn)
-		if err != nil {
-			return err
-		}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+
+	case <-time.After(1 * time.Minute):
+		return fmt.Errorf("timed out waiting for DB")
+
+	case <-done:
+		return nil
 	}
 }
 
-func (o *Outbox) connect(ctx context.Context) (*pgx.Conn, error) {
-	dialContext, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-
-	dsn, err := o.connector.DSN(dialContext)
-	if err != nil {
-		return nil, fmt.Errorf("getting connection DSN: %w", err)
-	}
-
-	conn, err := pgx.Connect(ctx, dsn)
-	if err != nil {
-		return nil, fmt.Errorf("connecting to PG: %w", err)
-	}
-
-	for {
-		if err := conn.Ping(ctx); err != nil {
-			log.WithError(ctx, err).Warn("pinging PG")
-			time.Sleep(time.Second)
-			continue
-		}
-
-		log.Info(ctx, "pinging PG OK")
-		break
-	}
-
-	return conn, nil
-}
-
-func (o *Outbox) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
+func (o *Outbox) loopUntilEmpty(ctx context.Context, conn *pgxpool.Conn) error {
 	log.Debug(ctx, "loopUntilEmpty")
 	for {
 		log.Debug(ctx, "doPage")
 
 		count, err := o.doPage(ctx, conn)
 		if err != nil {
-			log.WithError(ctx, err).Error("Error running message page")
 			return fmt.Errorf("error doing page of messages: %w", err)
 		}
 
@@ -154,7 +159,7 @@ func (o *Outbox) loopUntilEmpty(ctx context.Context, conn *pgx.Conn) error {
 	}
 }
 
-func (o *Outbox) doPage(ctx context.Context, conn *pgx.Conn) (int, error) {
+func (o *Outbox) doPage(ctx context.Context, conn *pgxpool.Conn) (int, error) {
 	var count int
 
 	tx, err := conn.BeginTx(ctx, pgx.TxOptions{
