@@ -8,7 +8,8 @@ import (
 )
 
 type OutboxConfig struct {
-	PostgresOutboxURI []string `env:"POSTGRES_OUTBOX" default:""`
+	PostgresOutboxURI       []string `env:"POSTGRES_OUTBOX" default:""`
+	PostgresOutboxDelayable bool     `env:"POSTGRES_OUTBOX_DELAYABLE" default:"false"`
 }
 
 type App struct {
@@ -24,7 +25,7 @@ func NewApps(envConfig OutboxConfig, parser Parser, sender Batcher, pgConfigs pg
 			return nil, fmt.Errorf("building postgres connection: %w", err)
 		}
 
-		app, err := NewApp(conn, sender, parser)
+		app, err := NewApp(conn, sender, parser, envConfig.PostgresOutboxDelayable)
 		if err != nil {
 			return nil, fmt.Errorf("creating outbox listener: %w", err)
 		}
@@ -35,10 +36,10 @@ func NewApps(envConfig OutboxConfig, parser Parser, sender Batcher, pgConfigs pg
 	return apps, nil
 }
 
-func NewApp(conn pgclient.PGConnector, batcher Batcher, parser Parser) (*App, error) {
+func NewApp(conn pgclient.PGConnector, batcher Batcher, parser Parser, delayable bool) (*App, error) {
 	name := conn.Name()
 
-	o, err := NewOutbox(conn, batcher, parser)
+	o, err := NewOutbox(conn, batcher, parser, delayable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create outbox listener: %w", err)
 	}
@@ -52,5 +53,5 @@ func NewApp(conn pgclient.PGConnector, batcher Batcher, parser Parser) (*App, er
 }
 
 func (a *App) Run(ctx context.Context) error {
-	return a.Outbox.Listen(ctx)
+	return a.Outbox.Run(ctx)
 }
