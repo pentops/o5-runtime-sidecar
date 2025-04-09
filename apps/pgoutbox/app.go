@@ -13,7 +13,7 @@ type OutboxConfig struct {
 
 type App struct {
 	Name string
-	*Listener
+	*Outbox
 }
 
 func NewApps(envConfig OutboxConfig, parser Parser, sender Batcher, pgConfigs pgclient.ConfigSet) ([]*App, error) {
@@ -38,19 +38,19 @@ func NewApps(envConfig OutboxConfig, parser Parser, sender Batcher, pgConfigs pg
 func NewApp(conn pgclient.PGConnector, batcher Batcher, parser Parser) (*App, error) {
 	name := conn.Name()
 
-	ll, err := NewListener(conn, batcher, parser)
+	o, err := NewOutbox(conn, batcher, parser)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create outbox listener: %w", err)
 	}
 
 	app := &App{
-		Name:     fmt.Sprintf("outbox-%s", name),
-		Listener: ll,
+		Name:   fmt.Sprintf("outbox-%s", name),
+		Outbox: o,
 	}
 
 	return app, nil
 }
 
-func (ol *App) Run(ctx context.Context) error {
-	return ol.Listener.Listen(ctx)
+func (a *App) Run(ctx context.Context) error {
+	return a.Outbox.Listen(ctx)
 }

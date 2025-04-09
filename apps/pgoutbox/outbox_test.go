@@ -127,7 +127,7 @@ func TestOutbox(t *testing.T) {
 	}
 
 	conv := msgconvert.NewConverter(source)
-	o, err := NewListener(conn, batcher, conv)
+	o, err := NewOutbox(conn, batcher, conv)
 	if err != nil {
 		t.Fatalf("failed to create outbox listener: %s", err)
 	}
