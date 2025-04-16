@@ -91,6 +91,11 @@ func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
 		}
 	}
 
+	o5Wrapper := &messaging_pb.Message{}
+	if err := protojson.Unmarshal([]byte(*msg.Body), o5Wrapper); err == nil {
+		return o5Wrapper, nil
+	}
+
 	return nil, fmt.Errorf("unsupported message format")
 }
 
