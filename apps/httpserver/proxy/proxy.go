@@ -149,7 +149,7 @@ func (rr *Router) RegisterGRPCService(ctx context.Context, sd protoreflect.Servi
 	}
 
 	methods := sd.Methods()
-	for ii := 0; ii < methods.Len(); ii++ {
+	for ii := range methods.Len() {
 		method := methods.Get(ii)
 		if err := rr.registerMethod(ctx, method, invoker, defaultAuth); err != nil {
 			return fmt.Errorf("failed to register grpc method: %w", err)
