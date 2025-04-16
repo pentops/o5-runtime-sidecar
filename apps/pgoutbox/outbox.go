@@ -15,7 +15,7 @@ import (
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 )
 
-var SendErr = errors.New("error sending batch of outbox messages")
+var ErrSend = errors.New("error sending batch of outbox messages")
 
 type Batcher interface {
 	PublishBatch(ctx context.Context, messages []*messaging_pb.Message) ([]string, error)
@@ -185,7 +185,7 @@ func (o *Outbox) doPage(ctx context.Context, conn *pgxpool.Conn) (int, error) {
 	}
 
 	bErr := o.doBatch(ctx, tx)
-	if bErr != nil && !errors.Is(bErr, SendErr) {
+	if bErr != nil && !errors.Is(bErr, ErrSend) {
 		_ = tx.Rollback(ctx)
 		return 0, bErr
 	}
@@ -195,7 +195,7 @@ func (o *Outbox) doPage(ctx context.Context, conn *pgxpool.Conn) (int, error) {
 		return 0, fmt.Errorf("error committing transaction: %w", err)
 	}
 
-	if errors.Is(bErr, SendErr) {
+	if errors.Is(bErr, ErrSend) {
 		return 0, fmt.Errorf("error sending batch of outbox messages: %w", bErr)
 	}
 
@@ -284,7 +284,7 @@ func (o *Outbox) doBatch(ctx context.Context, tx pgx.Tx) error {
 
 	if delayedErr != nil {
 		// mark as a send error so the caller can decide whether to commit or not
-		return fmt.Errorf("%w: %w", SendErr, delayedErr)
+		return fmt.Errorf("%w: %w", ErrSend, delayedErr)
 	}
 
 	return nil

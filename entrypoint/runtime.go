@@ -7,7 +7,8 @@ import (
 	"strings"
 
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/adapters/grpc_reflect"
+	"github.com/pentops/o5-runtime-sidecar/adapters/grpcreflect"
+
 	"github.com/pentops/o5-runtime-sidecar/adapters/msgconvert"
 	"github.com/pentops/o5-runtime-sidecar/apps/bridge"
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver"
@@ -19,7 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var NothingToDoError = errors.New("no services configured")
+var ErrNothingToDo = errors.New("no services configured")
 
 type Runtime struct {
 	sender Publisher
@@ -32,7 +33,7 @@ type Runtime struct {
 
 	msgConverter *msgconvert.Converter
 
-	reflectionClients []*grpc_reflect.ReflectionClient
+	reflectionClients []*grpcreflect.ReflectionClient
 	endpoints         []string
 	endpointWait      chan struct{}
 }
@@ -120,7 +121,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	}
 
 	if !didAnything {
-		return NothingToDoError
+		return ErrNothingToDo
 	}
 
 	if err := runGroup.Wait(); err != nil {
@@ -132,16 +133,16 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	return nil
 }
 
-func (rt *Runtime) connectEndpoint(endpoint string) (*grpc_reflect.ReflectionClient, error) {
+func (rt *Runtime) connectEndpoint(endpoint string) (*grpcreflect.ReflectionClient, error) {
 	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("dial: %w", err)
 	}
 
-	return grpc_reflect.NewClient(conn), nil
+	return grpcreflect.NewClient(conn), nil
 }
 
-func (rt *Runtime) registerEndpoint(ctx context.Context, prClient *grpc_reflect.ReflectionClient) error {
+func (rt *Runtime) registerEndpoint(ctx context.Context, prClient *grpcreflect.ReflectionClient) error {
 	ss, err := prClient.FetchServices(ctx)
 	if err != nil {
 		return fmt.Errorf("fetch: %w", err)

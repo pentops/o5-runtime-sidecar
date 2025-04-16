@@ -39,14 +39,14 @@ func NewListener(network, bind string, dbs map[string]pgclient.PGConnector) (*Li
 	}, nil
 }
 
-func (l *Listener) Listen(ctx context.Context) error {
+func (ll *Listener) Listen(ctx context.Context) error {
 	lc := net.ListenConfig{}
-	ln, err := lc.Listen(ctx, l.network, l.bind)
+	ln, err := lc.Listen(ctx, ll.network, ll.bind)
 	if err != nil {
 		return err
 	}
 
-	log.WithField(ctx, "bind", l.bind).Info("pgproxy: Ready")
+	log.WithField(ctx, "bind", ll.bind).Info("pgproxy: Ready")
 
 	go func() {
 		<-ctx.Done()
@@ -64,11 +64,11 @@ func (l *Listener) Listen(ctx context.Context) error {
 			return err
 		}
 
-		go l.newConn(ctx, conn)
+		go ll.newConn(ctx, conn)
 	}
 }
 
-func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
+func (ll *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 	defer clientConn.Close()
 	ctx = log.WithField(ctx, "clientAddr", clientConn.RemoteAddr().String())
 
@@ -80,7 +80,7 @@ func (ln *Listener) newConn(ctx context.Context, clientConn net.Conn) {
 	log.WithField(ctx, "data", client.Data).Info("client connected")
 	defer client.Close()
 
-	serverConfig, ok := ln.dbs[client.Data.Database]
+	serverConfig, ok := ll.dbs[client.Data.Database]
 	if !ok {
 		client.Fatalf(ctx, "database %s not found", client.Data.Database)
 		return

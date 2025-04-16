@@ -43,7 +43,7 @@ func TestLoader(t *testing.T) {
 		t.Error("expected error - nothing configured")
 	}
 
-	if !errors.Is(err, NothingToDoError) {
+	if !errors.Is(err, ErrNothingToDo) {
 		t.Errorf("expected NothingToDoError, got %v", err)
 	}
 }

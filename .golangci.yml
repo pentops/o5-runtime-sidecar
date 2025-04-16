@@ -24,6 +24,11 @@ linters:
       - third_party$
       - builtin$
       - examples$
+  settings:
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF1008"
 formatters:
   enable:
     - gofmt

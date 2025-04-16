@@ -53,8 +53,8 @@ func NewBackend(ctx context.Context, clientConn io.ReadWriteCloser) (*Backend, e
 	return be, nil
 }
 
-func (b *Backend) Close() error {
-	return b.conn.Close()
+func (be *Backend) Close() error {
+	return be.conn.Close()
 }
 
 func (be *Backend) Passthrough(ctx context.Context, frontend *pgproto3.Frontend) error {
@@ -79,14 +79,14 @@ func (be *Backend) Fatalf(ctx context.Context, msg string, args ...any) {
 	be.Fatal(ctx, msg)
 }
 
-func (b *Backend) Fatal(ctx context.Context, msg string) {
+func (be *Backend) Fatal(ctx context.Context, msg string) {
 	log.WithField(ctx, "error", msg).Warn("sending fatal error to client")
-	b.backend.Send(&pgproto3.ErrorResponse{
+	be.backend.Send(&pgproto3.ErrorResponse{
 		Severity: "FATAL",
 		Message:  msg,
 	})
 
-	err := b.backend.Flush()
+	err := be.backend.Flush()
 	if err != nil {
 		log.WithError(ctx, err).Error("failed to send fatal message to client")
 	}
@@ -94,11 +94,11 @@ func (b *Backend) Fatal(ctx context.Context, msg string) {
 
 const TxStatusIdle = 'I'
 
-func (b *Backend) SendReady() error {
-	b.backend.Send(&pgproto3.AuthenticationOk{})
-	b.backend.Send(&pgproto3.ReadyForQuery{TxStatus: TxStatusIdle})
+func (be *Backend) SendReady() error {
+	be.backend.Send(&pgproto3.AuthenticationOk{})
+	be.backend.Send(&pgproto3.ReadyForQuery{TxStatus: TxStatusIdle})
 
-	err := b.backend.Flush()
+	err := be.backend.Flush()
 	if err != nil {
 		return fmt.Errorf("failed to send ready for query: %w", err)
 	}

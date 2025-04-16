@@ -1,4 +1,4 @@
-package grpc_reflect
+package grpcreflect
 
 import (
 	"context"

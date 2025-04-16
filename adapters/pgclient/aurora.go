@@ -13,8 +13,8 @@ import (
 type AuroraConfig struct {
 	Endpoint string `json:"endpoint"` // Address and Port
 	Port     int    `json:"port"`
-	DbName   string `json:"dbName"`
-	DbUser   string `json:"dbUser"`
+	DBName   string `json:"dbName"`
+	DBUser   string `json:"dbUser"`
 }
 
 type auroraConnector struct {
@@ -106,7 +106,7 @@ func (cb *CredBuilder) NewToken(ctx context.Context, lookupName string) (string,
 
 func (cb *CredBuilder) newToken(ctx context.Context, config *AuroraConfig) (string, error) {
 	authenticationToken, err := auth.BuildAuthToken(
-		ctx, fmt.Sprintf("%s:%d", config.Endpoint, config.Port), cb.region, config.DbUser, cb.creds)
+		ctx, fmt.Sprintf("%s:%d", config.Endpoint, config.Port), cb.region, config.DBUser, cb.creds)
 	if err != nil {
 		return "", fmt.Errorf("failed to create authentication token: %w", err)
 	}
@@ -128,10 +128,10 @@ func (cb *CredBuilder) ConnectionString(ctx context.Context, lookupName string) 
 	}
 
 	return fmt.Sprintf("user=%s password=%s host=%s port=%d dbname=%s",
-		config.DbUser,
+		config.DBUser,
 		token,
 		config.Endpoint,
 		config.Port,
-		config.DbName,
+		config.DBName,
 	), nil
 }
