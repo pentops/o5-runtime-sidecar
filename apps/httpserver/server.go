@@ -7,10 +7,10 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/pentops/j5/lib/proxy"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver/jwtauth"
-	"github.com/pentops/o5-runtime-sidecar/apps/httpserver/proxy"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
 	"golang.org/x/sync/errgroup"
 

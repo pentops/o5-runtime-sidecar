@@ -14,15 +14,14 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sts v1.33.17
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.6.0
-	github.com/gorilla/mux v1.8.1
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d
-	github.com/pentops/flowtest v0.0.0-20241110231021-42663ac00b63
-	github.com/pentops/j5 v0.0.0-20250403053555-39eedd7c77f9
-	github.com/pentops/jwtauth v0.0.0-20240806162904-172fc7d1f05b
-	github.com/pentops/log.go v0.0.0-20250304233315-e0210b7a6dc3
-	github.com/pentops/o5-messaging v0.0.0-20250317182016-de51c0e702a3
+	github.com/pentops/flowtest v0.0.0-20250416222312-c5823a736ca5
+	github.com/pentops/j5 v0.0.0-20250514220842-c918124a4d17
+	github.com/pentops/jwtauth v0.0.0-20250513204352-daaf08ee1ada
+	github.com/pentops/log.go v0.0.0-20250429190647-bb37ccaaabe4
+	github.com/pentops/o5-messaging v0.0.0-20250408063726-cf9d6419c7cd
 	github.com/pentops/runner v0.0.0-20250116202335-8635b2a42547
 	github.com/pressly/goose/v3 v3.24.2
 	github.com/rs/cors v1.11.0
@@ -47,8 +46,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.29.1 // indirect
 	github.com/aws/smithy-go v1.22.3 // indirect
+	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
@@ -56,6 +57,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
+	github.com/pentops/golib v0.0.0-20250326060930-8c83d58ddb63 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
