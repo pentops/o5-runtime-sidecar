@@ -5,19 +5,19 @@ import (
 	"testing"
 
 	"github.com/pentops/flowtest"
-	"github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb"
+	"github.com/pentops/o5-runtime-sidecar/testproto/gen/test/v1/test_spb"
 	"google.golang.org/grpc/reflection"
 )
 
 type Service struct {
-	testpb.UnimplementedFooServiceServer
+	test_spb.UnimplementedFooServiceServer
 }
 
 func TestProtoReadHappy(t *testing.T) {
 	grpcPair := flowtest.NewGRPCPair(t)
 
 	service := &Service{}
-	testpb.RegisterFooServiceServer(grpcPair.Server, service)
+	test_spb.RegisterFooServiceServer(grpcPair.Server, service)
 	reflection.Register(grpcPair.Server)
 
 	ctx, cancel := context.WithCancel(context.Background())

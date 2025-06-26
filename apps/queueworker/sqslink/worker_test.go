@@ -7,7 +7,7 @@ import (
 	"github.com/pentops/j5/gen/j5/messaging/v1/messaging_j5pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/o5msg"
-	"github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb"
+	"github.com/pentops/o5-runtime-sidecar/testproto/gen/test/v1/test_tpb"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
@@ -25,17 +25,17 @@ func TestChance(t *testing.T) {
 func TestDynamicParse(t *testing.T) {
 	ww := NewWorker(nil, "https://test.com/queue", nil, 0)
 
-	fd := testpb.File_test_v1_test_proto.Services().Get(1)
+	fd := test_tpb.File_test_v1_topic_test_p_j5s_proto.Services().Get(0)
 	if err := ww.RegisterService(context.Background(), fd, nil); err != nil {
 		t.Fatal(err.Error())
 	}
 
-	handler, ok := ww.handlers["/test.v1.FooTopic/Foo"].(*service)
+	handler, ok := ww.handlers["/test.v1.topic.TestPublishTopic/Foo"].(*service)
 	if !ok || handler == nil {
 		t.Fatal("handler is nil")
 	}
 
-	want := &testpb.FooMessage{
+	want := &test_tpb.FooMessage{
 		Name: "test",
 		Id:   "asdf",
 	}
@@ -59,18 +59,21 @@ func TestDynamicParse(t *testing.T) {
 func TestRequestMetadata(t *testing.T) {
 	ww := NewWorker(nil, "https://test.com/queue", nil, 0)
 
-	fd := testpb.File_test_v1_test_proto.Services().ByName("RequestTopic")
+	fd := test_tpb.File_test_v1_topic_test_p_j5s_proto.Services().ByName("TestReqResRequestTopic")
+	if fd == nil {
+		t.Fatal("no service found")
+	}
 
 	if err := ww.RegisterService(context.Background(), fd, nil); err != nil {
 		t.Fatal(err.Error())
 	}
 
-	handler, ok := ww.handlers["/test.v1.RequestTopic/Request"].(*service)
+	handler, ok := ww.handlers["/test.v1.topic.TestReqResRequestTopic/TestReqResRequest"].(*service)
 	if !ok || handler == nil {
 		t.Fatal("handler is nil")
 	}
 
-	input := &testpb.RequestMessage{
+	input := &test_tpb.TestReqResRequestMessage{
 		Request: &messaging_j5pb.RequestMetadata{
 			ReplyTo: "prior",
 			Context: []byte("value"),
@@ -95,7 +98,7 @@ func TestRequestMetadata(t *testing.T) {
 		t.Fatal(err.Error())
 	}
 
-	want := &testpb.RequestMessage{
+	want := &test_tpb.TestReqResRequestMessage{
 		Request: &messaging_j5pb.RequestMetadata{
 			ReplyTo: "injected",
 			Context: []byte("value"),

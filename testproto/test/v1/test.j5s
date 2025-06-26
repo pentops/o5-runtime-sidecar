@@ -1,27 +1,29 @@
-syntax = "proto3";
+package test.v1
 
-package test.v1;
+service Foo {
+	basePath = "/test/v1/foo"
 
-import "google/api/annotations.proto";
-import "google/protobuf/empty.proto";
-import "google/protobuf/timestamp.proto";
-import "j5/messaging/v1/annotations.proto";
-import "j5/messaging/v1/reqres.proto";
+	method GetFoo {
+		httpMethod = "GET"
+		httpPath = "/{id}"
 
-option go_package = "github.com/pentops/o5-runtime-sidecar/testproto/gen/testpb";
+		request {
+			field id string | ID of the foo
+			field number integer:INT64 | A number
+			field numbers array:float:FLOAT64 | Multiple numbers
+			//field query object:QueryMessage | A query object
+			field multipleWord string | A field with multiple words
+		}
 
-service FooService {
-  rpc GetFoo(GetFooRequest) returns (GetFooResponse) {
-    option (google.api.http) = {get: "/test/v1/foo/{id}"};
-  }
-
-  rpc PostFoo(PostFooRequest) returns (PostFooResponse) {
-    option (google.api.http) = {
-      post: "/test/v1/foo"
-      body: "*"
-    };
-  }
+		response {
+			field id string
+			field name string
+			field field string
+		}
+	}
 }
+
+/*
 
 message GetFooRequest {
   string id = 1;
@@ -90,17 +92,31 @@ message PostFooResponse {
   string name = 2;
   string field = 3;
 }
+*/
 
-service FooTopic {
-  rpc Foo(FooMessage) returns (google.protobuf.Empty) {}
+
+topic TestPublish publish {
+	message Foo {
+		field id string
+		field name string
+	}
 }
 
-message FooMessage {
-  string id = 1;
-  string name = 2;
-  string field = 3;
+
+topic TestReqRes reqres {
+
+	request {
+		field id string
+	}
+
+	reply {
+		field id string
+		field name string
+	}
+
 }
 
+/*
 service RequestTopic {
   rpc Request(RequestMessage) returns (google.protobuf.Empty) {}
 
@@ -124,4 +140,4 @@ service ReplyTopic {
 
 message ReplyMessage {
   j5.messaging.v1.RequestMetadata request = 1;
-}
+}*/
