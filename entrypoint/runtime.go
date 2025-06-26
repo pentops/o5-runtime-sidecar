@@ -79,7 +79,6 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	runGroup.Add("register-endpoints", func(ctx context.Context) error {
 		defer close(rt.endpointWait)
 		for _, endpoint := range rt.endpoints {
-			endpoint := endpoint
 			prClient, err := rt.connectEndpoint(endpoint)
 			if err != nil {
 				return fmt.Errorf("connect to endpoint %s: %w", endpoint, err)

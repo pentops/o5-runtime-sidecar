@@ -165,8 +165,8 @@ func tryParsePGString(name string) (string, bool, error) {
 	}
 
 	if strings.Contains(name, "=") {
-		parts := strings.Split(name, " ")
-		for _, part := range parts {
+		parts := strings.SplitSeq(name, " ")
+		for part := range parts {
 			if part == "" {
 				continue
 			}

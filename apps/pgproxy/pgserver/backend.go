@@ -34,7 +34,7 @@ func NewBackend(ctx context.Context, clientConn io.ReadWriteCloser) (*Backend, e
 		return nil, fmt.Errorf("client handshake: %w", err)
 	}
 
-	ctx = log.WithFields(ctx, map[string]interface{}{
+	ctx = log.WithFields(ctx, map[string]any{
 		"user":     be.Data.User,
 		"database": be.Data.Database,
 	})

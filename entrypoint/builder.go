@@ -19,12 +19,13 @@ type Config struct {
 	EnvironmentName string `env:"ENVIRONMENT_NAME" `
 	SidecarVersion  string // set from main
 
-	httpserver.ServerConfig
-	queueworker.WorkerConfig
-	pgproxy.ProxyConfig
-	pgoutbox.OutboxConfig
-	bridge.BridgeConfig
-	eventbridge.EventBridgeConfig
+	ServerConfig httpserver.ServerConfig
+	WorkerConfig queueworker.WorkerConfig
+	ProxyConfig  pgproxy.ProxyConfig
+
+	OutboxConfig      pgoutbox.OutboxConfig
+	BridgeConfig      bridge.BridgeConfig
+	EventBridgeConfig eventbridge.EventBridgeConfig
 
 	ServiceEndpoints []string `env:"SERVICE_ENDPOINT" default:""`
 }
@@ -71,7 +72,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	}
 
 	// Proxy a Postgres connection, handling IAM auth
-	if len(envConfig.PostgresProxy) > 0 {
+	if len(envConfig.ProxyConfig.PostgresProxy) > 0 {
 		p, err := pgproxy.NewApp(envConfig.ProxyConfig, pgConfigs)
 		if err != nil {
 			return nil, fmt.Errorf("creating postgres proxy: %w", err)
@@ -96,11 +97,11 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 			return nil, fmt.Errorf("bridge requires a sender")
 		}
 
-		runtime.adapter = bridge.NewApp(envConfig.AdapterAddr, runtime.sender, runtime.msgConverter)
+		runtime.adapter = bridge.NewApp(envConfig.BridgeConfig.AdapterAddr, runtime.sender, runtime.msgConverter)
 	}
 
 	// Serve a public HTTP server
-	if envConfig.PublicAddr != "" {
+	if envConfig.ServerConfig.PublicAddr != "" {
 		r, err := httpserver.NewRouter(envConfig.ServerConfig, srcConfig)
 		if err != nil {
 			return nil, fmt.Errorf("creating router: %w", err)

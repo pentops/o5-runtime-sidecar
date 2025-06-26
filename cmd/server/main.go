@@ -15,7 +15,7 @@ var Version string = "dev"
 
 func main() {
 	ctx := context.Background()
-	ctx = log.WithFields(ctx, map[string]interface{}{
+	ctx = log.WithFields(ctx, map[string]any{
 		"application": "o5-runtime-sidecar",
 		"version":     Version,
 	})

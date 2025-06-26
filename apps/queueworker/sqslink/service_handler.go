@@ -17,7 +17,7 @@ import (
 )
 
 type AppLink interface {
-	Invoke(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
+	Invoke(context.Context, string, any, any, ...grpc.CallOption) error
 	JSONToProto(body []byte, msg protoreflect.Message) error
 }
 

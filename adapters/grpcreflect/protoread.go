@@ -48,7 +48,7 @@ func (cl *ReflectionClient) Close() error {
 	return cl.conn.Close()
 }
 
-func (cl *ReflectionClient) Invoke(ctx context.Context, method string, req interface{}, res interface{}, opts ...grpc.CallOption) error {
+func (cl *ReflectionClient) Invoke(ctx context.Context, method string, req any, res any, opts ...grpc.CallOption) error {
 	return grpc.Invoke(ctx, method, req, res, cl.conn, opts...)
 }
 

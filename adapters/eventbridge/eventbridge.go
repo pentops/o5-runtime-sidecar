@@ -53,7 +53,7 @@ func NewEventBridgePublisher(client EventBridgeAPI, config EventBridgeConfig) (*
 }
 
 func (p *EventBridgePublisher) PublisherID() string {
-	return p.EventBridgeConfig.BusARN
+	return p.BusARN
 }
 
 func (p *EventBridgePublisher) Publish(ctx context.Context, message *messaging_pb.Message) error {
@@ -94,7 +94,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 	for idx, entry := range res.Entries {
 		request := messages[idx]
 		if entry.ErrorCode != nil {
-			log.WithFields(ctx, map[string]interface{}{
+			log.WithFields(ctx, map[string]any{
 				"eventBusArn":  p.BusARN,
 				"messageId":    request.MessageId,
 				"errorCode":    *entry.ErrorCode,
@@ -108,7 +108,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 			continue
 		}
 
-		log.WithFields(ctx, map[string]interface{}{
+		log.WithFields(ctx, map[string]any{
 			"eventBusArn": p.BusARN,
 			"messageId":   request.MessageId,
 		}).Info("Published to EventBus")

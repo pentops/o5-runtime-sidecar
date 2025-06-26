@@ -13,7 +13,7 @@ import (
 
 type JWKS interface {
 	GetKeys(keyID string) ([]jose.JSONWebKey, error)
-	KeyDebug() interface{}
+	KeyDebug() any
 }
 
 const (
@@ -63,7 +63,7 @@ func JWKSAuthFunc(jwks JWKS) func(context.Context, *http.Request) (map[string]st
 		}
 		if len(keys) != 1 {
 			keyDebug := jwks.KeyDebug()
-			log.WithFields(ctx, map[string]interface{}{
+			log.WithFields(ctx, map[string]any{
 				"presentedKeyID": keyID,
 				"foundKeys":      len(keys),
 				"keys":           keyDebug,

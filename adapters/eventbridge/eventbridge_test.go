@@ -91,7 +91,7 @@ func TestEventBridge(t *testing.T) {
 	assert.NotNil(t, entry.EventBusName)
 	assert.Equal(t, "EVENTBRIDGE_ARN", *entry.EventBusName)
 
-	detail := map[string]interface{}{}
+	detail := map[string]any{}
 	if err := json.Unmarshal([]byte(*entry.Detail), &detail); err != nil {
 		t.Fatal(err.Error())
 	}

@@ -196,7 +196,7 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		return
 	}
 
-	ctx = log.WithFields(ctx, map[string]interface{}{
+	ctx = log.WithFields(ctx, map[string]any{
 		"grpc-service":   parsed.GrpcService,
 		"grpc-method":    parsed.GrpcMethod,
 		"message-id":     parsed.MessageId,

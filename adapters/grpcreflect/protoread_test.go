@@ -1,7 +1,6 @@
 package grpcreflect
 
 import (
-	"context"
 	"testing"
 
 	"github.com/pentops/flowtest"
@@ -20,8 +19,7 @@ func TestProtoReadHappy(t *testing.T) {
 	test_spb.RegisterFooServiceServer(grpcPair.Server, service)
 	reflection.Register(grpcPair.Server)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	grpcPair.ServeUntilDone(t, ctx)
 

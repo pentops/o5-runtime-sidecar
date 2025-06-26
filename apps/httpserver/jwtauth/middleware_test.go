@@ -24,7 +24,7 @@ type testJWKS struct {
 	keys []jose.JSONWebKey
 }
 
-func (tj *testJWKS) KeyDebug() interface{} {
+func (tj *testJWKS) KeyDebug() any {
 	return tj.keys
 }
 
