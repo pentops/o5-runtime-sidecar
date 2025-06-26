@@ -1,1 +1,4 @@
 ---
+packages:
+  - name: test.v1
+    label: Test

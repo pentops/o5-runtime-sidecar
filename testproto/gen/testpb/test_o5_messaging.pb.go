@@ -7,7 +7,6 @@ package testpb
 
 import (
 	context "context"
-
 	messaging_j5pb "github.com/pentops/j5/gen/j5/messaging/v1/messaging_j5pb"
 	messaging_pb "github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	o5msg "github.com/pentops/o5-messaging/o5msg"
@@ -20,6 +19,31 @@ func (msg *RequestMessage) SetJ5RequestMetadata(md *messaging_j5pb.RequestMetada
 }
 func (msg *RequestMessage) GetJ5RequestMetadata() *messaging_j5pb.RequestMetadata {
 	return msg.Request
+}
+
+// Method: Request
+
+func (msg *RequestMessage) O5MessageHeader() o5msg.Header {
+	header := o5msg.Header{
+		GrpcService:      "test.v1.RequestTopic",
+		GrpcMethod:       "Request",
+		Headers:          map[string]string{},
+		DestinationTopic: "reqres",
+	}
+	if msg.Request != nil {
+		header.Extension = &messaging_pb.Message_Request_{
+			Request: &messaging_pb.Message_Request{
+				ReplyTo: msg.Request.ReplyTo,
+			},
+		}
+	} else {
+		header.Extension = &messaging_pb.Message_Request_{
+			Request: &messaging_pb.Message_Request{
+				ReplyTo: "",
+			},
+		}
+	}
+	return header
 }
 
 type RequestTopicTxSender[C any] struct {
@@ -75,29 +99,6 @@ func NewRequestTopicPublisher(publisher o5msg.Publisher) *RequestTopicPublisher 
 
 // Method: Request
 
-func (msg *RequestMessage) O5MessageHeader() o5msg.Header {
-	header := o5msg.Header{
-		GrpcService:      "test.v1.RequestTopic",
-		GrpcMethod:       "Request",
-		Headers:          map[string]string{},
-		DestinationTopic: "reqres",
-	}
-	if msg.Request != nil {
-		header.Extension = &messaging_pb.Message_Request_{
-			Request: &messaging_pb.Message_Request{
-				ReplyTo: msg.Request.ReplyTo,
-			},
-		}
-	} else {
-		header.Extension = &messaging_pb.Message_Request_{
-			Request: &messaging_pb.Message_Request{
-				ReplyTo: "",
-			},
-		}
-	}
-	return header
-}
-
 func (send RequestTopicTxSender[C]) Request(ctx context.Context, sendContext C, msg *RequestMessage) error {
 	return send.sender.Send(ctx, sendContext, msg)
 }
@@ -117,6 +118,25 @@ func (msg *ReplyMessage) SetJ5RequestMetadata(md *messaging_j5pb.RequestMetadata
 }
 func (msg *ReplyMessage) GetJ5RequestMetadata() *messaging_j5pb.RequestMetadata {
 	return msg.Request
+}
+
+// Method: Reply
+
+func (msg *ReplyMessage) O5MessageHeader() o5msg.Header {
+	header := o5msg.Header{
+		GrpcService:      "test.v1.ReplyTopic",
+		GrpcMethod:       "Reply",
+		Headers:          map[string]string{},
+		DestinationTopic: "reqres",
+	}
+	if msg.Request != nil {
+		header.Extension = &messaging_pb.Message_Reply_{
+			Reply: &messaging_pb.Message_Reply{
+				ReplyTo: msg.Request.ReplyTo,
+			},
+		}
+	}
+	return header
 }
 
 type ReplyTopicTxSender[C any] struct {
@@ -171,23 +191,6 @@ func NewReplyTopicPublisher(publisher o5msg.Publisher) *ReplyTopicPublisher {
 }
 
 // Method: Reply
-
-func (msg *ReplyMessage) O5MessageHeader() o5msg.Header {
-	header := o5msg.Header{
-		GrpcService:      "test.v1.ReplyTopic",
-		GrpcMethod:       "Reply",
-		Headers:          map[string]string{},
-		DestinationTopic: "reqres",
-	}
-	if msg.Request != nil {
-		header.Extension = &messaging_pb.Message_Reply_{
-			Reply: &messaging_pb.Message_Reply{
-				ReplyTo: msg.Request.ReplyTo,
-			},
-		}
-	}
-	return header
-}
 
 func (send ReplyTopicTxSender[C]) Reply(ctx context.Context, sendContext C, msg *ReplyMessage) error {
 	return send.sender.Send(ctx, sendContext, msg)
