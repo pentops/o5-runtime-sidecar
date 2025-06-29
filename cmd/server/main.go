@@ -21,10 +21,10 @@ func main() {
 		"version":     Version,
 	})
 
-	cfg := entrypoint.Config{}
+	cfg := &entrypoint.Config{}
 
 	args := os.Args[1:]
-	configValue := reflect.ValueOf(cfg).Elem()
+	configValue := reflect.ValueOf(cfg)
 	parseError := cliconf.ParseCombined(configValue, args)
 	if parseError != nil {
 		log.WithError(ctx, parseError).Error("Config Failure")
@@ -33,7 +33,7 @@ func main() {
 
 	cfg.SidecarVersion = Version
 
-	if err := run(ctx, cfg); err != nil {
+	if err := run(ctx, *cfg); err != nil {
 		log.WithError(ctx, err).Error("Failed to serve")
 		os.Exit(1)
 	}
