@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 
-	"github.com/pentops/envconf.go/envconf"
 	"github.com/pentops/o5-runtime-sidecar/entrypoint"
+	"github.com/pentops/runner/cliconf"
 
 	"github.com/pentops/log.go/log"
 )
@@ -22,8 +23,11 @@ func main() {
 
 	cfg := entrypoint.Config{}
 
-	if err := envconf.Parse(&cfg); err != nil {
-		log.WithError(ctx, err).Error("Config Failure")
+	args := os.Args[1:]
+	configValue := reflect.ValueOf(cfg).Elem()
+	parseError := cliconf.ParseCombined(configValue, args)
+	if parseError != nil {
+		log.WithError(ctx, parseError).Error("Config Failure")
 		os.Exit(1)
 	}
 

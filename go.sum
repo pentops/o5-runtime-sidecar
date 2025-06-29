@@ -111,8 +111,6 @@ github.com/mfridman/interpolate v0.0.2/go.mod h1:p+7uk6oE07mpE/Ik1b8EckO0O4ZXiGA
 github.com/ncruces/go-strftime v0.1.9 h1:bY0MQC28UADQmHmaF5dgpLmImcShSi2kHU9XLdhx/f4=
 github.com/ncruces/go-strftime v0.1.9/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
 github.com/opentracing/opentracing-go v1.1.0/go.mod h1:UkNAQd3GIcIGf0SeVgPpRdFStlNbqXla1AfSYxPUl2o=
-github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d h1:8+nKhf+5Ms60LUBx3K3ccTyM1PWZrjgIEb0lJBvVwj4=
-github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d/go.mod h1:NYtaIY8a+Y8LYV9Y/nJb24zxx8mQyRK4h9k2oZDJveI=
 github.com/pentops/flowtest v0.0.0-20250611222350-b5c7162d9db1 h1:HFhoMQYMnf4rhXqFz9rJznYcLexvzA/tSoZW6024nUs=
 github.com/pentops/flowtest v0.0.0-20250611222350-b5c7162d9db1/go.mod h1:vNp8crAKcH0f/sZU9frkmQLUeDsTIgMqV14kQtkAqC0=
 github.com/pentops/golib v0.0.0-20250326060930-8c83d58ddb63 h1:s5qtWT2/s79gy/wm3/bwvKYLK6u2AkW05JiLPqxraP0=

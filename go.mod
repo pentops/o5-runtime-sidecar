@@ -17,7 +17,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.4
-	github.com/pentops/envconf.go v0.0.0-20241008010024-9864aef6219d
 	github.com/pentops/flowtest v0.0.0-20250611222350-b5c7162d9db1
 	github.com/pentops/j5 v0.0.0-20250625220400-ddb847893140
 	github.com/pentops/jwtauth v0.0.0-20250513204352-daaf08ee1ada
