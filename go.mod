@@ -16,19 +16,19 @@ require (
 	github.com/elgris/sqrl v0.0.0-20210727210741-7e0198b30236
 	github.com/google/uuid v1.6.0
 	github.com/iancoleman/strcase v0.3.0
-	github.com/jackc/pgx/v5 v5.7.4
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/pentops/flowtest v0.0.0-20250611222350-b5c7162d9db1
 	github.com/pentops/j5 v0.0.0-20250710232735-7c1862821a09
 	github.com/pentops/jwtauth v0.0.0-20250630202946-98a36d9c604b
 	github.com/pentops/log.go v0.0.16
 	github.com/pentops/o5-messaging v0.0.0-20250619024104-7e07c29129f0
 	github.com/pentops/runner v0.0.0-20250619010747-2bb7a5385324
-	github.com/pressly/goose/v3 v3.24.2
-	github.com/rs/cors v1.11.0
+	github.com/pressly/goose/v3 v3.24.3
+	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/sync v0.14.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822
-	google.golang.org/grpc v1.72.2
+	golang.org/x/sync v0.16.0
+	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7
+	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
