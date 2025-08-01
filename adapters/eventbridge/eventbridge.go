@@ -8,9 +8,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge/types"
+	"github.com/pentops/j5/lib/j5codec"
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 type EventBridgeConfig struct {
@@ -121,7 +121,7 @@ func (p *EventBridgePublisher) PublishBatch(ctx context.Context, messages []*mes
 
 func (p *EventBridgePublisher) buildPutEventEntry(input *messaging_pb.Message) (*types.PutEventsRequestEntry, error) {
 	// eventbridge requires JSON bodies.
-	detai, err := protojson.Marshal(input)
+	detail, err := j5codec.Global.ProtoToJSON(input.ProtoReflect())
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (p *EventBridgePublisher) buildPutEventEntry(input *messaging_pb.Message) (
 	source := fmt.Sprintf("o5/%s/%s", input.SourceEnv, input.SourceApp)
 
 	entry := &types.PutEventsRequestEntry{
-		Detail:       aws.String(string(detai)),
+		Detail:       aws.String(string(detail)),
 		DetailType:   aws.String(EventBridgeO5MessageDetailType),
 		Source:       aws.String(source),
 		EventBusName: aws.String(p.BusARN),

@@ -9,6 +9,7 @@ linters:
     - misspell
     - rowserrcheck
     - sqlclosecheck
+    - forbidigo
   disable:
     - gochecknoglobals
     - prealloc
@@ -24,6 +25,18 @@ linters:
       - third_party$
       - builtin$
       - examples$
+    rules:
+      - path: cmd
+        linters:
+          - forbidigo
+  settings:
+    forbidigo:
+      forbid:
+        - pattern: ^proto\.GetExtension.*$
+          msg: "Use protosrc.GetExtension instead of proto.GetExtension"
+        - pattern: ^protojson.*
+          msg: "Use j5codec instead of protojson"
+        - pattern: ^(fmt\.Print(|f|ln))$
 formatters:
   enable:
     - gofmt

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/pentops/j5/lib/j5codec"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -33,7 +34,7 @@ func (ll *Converter) SetReflectionClient(reflection ReflectionClient) {
 
 func (ll *Converter) ParseMessage(id string, data []byte) (*messaging_pb.Message, error) {
 	msg := &messaging_pb.Message{}
-	if err := protojson.Unmarshal(data, msg); err != nil {
+	if err := j5codec.Global.JSONToProto(data, msg.ProtoReflect()); err != nil {
 		return nil, fmt.Errorf("error unmarshalling outbox message: %w", err)
 	}
 
@@ -93,7 +94,7 @@ func (ll *Converter) toJ5JSON(body *messaging_pb.Any) (*messaging_pb.Any, error)
 		}
 
 	case messaging_pb.WireEncoding_PROTOJSON:
-		if err := protojson.Unmarshal(body.Value, msg.Interface()); err != nil {
+		if err := protojson.Unmarshal(body.Value, msg.Interface()); err != nil { // nolint:forbidigo
 			return nil, fmt.Errorf("error unmarshalling protojson: %w", err)
 		}
 

@@ -8,7 +8,7 @@ import (
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/o5msg"
 	"github.com/pentops/o5-runtime-sidecar/testproto/gen/test/v1/test_tpb"
-	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -51,7 +51,7 @@ func TestDynamicParse(t *testing.T) {
 	}
 
 	if !proto.Equal(want, asProto) {
-		t.Log(protojson.Format(asProto))
+		t.Log(prototext.Format(asProto))
 		t.Fatalf("Messages do not match")
 	}
 }
@@ -105,8 +105,8 @@ func TestRequestMetadata(t *testing.T) {
 		},
 	}
 	if !proto.Equal(want, asProto) {
-		t.Log(protojson.Format(want))
-		t.Log(protojson.Format(asProto))
+		t.Log(prototext.Format(want))
+		t.Log(prototext.Format(asProto))
 		t.Fatalf("Messages do not match")
 	}
 }

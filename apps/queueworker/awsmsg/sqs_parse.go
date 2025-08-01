@@ -10,9 +10,9 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/google/uuid"
+	"github.com/pentops/j5/lib/j5codec"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-runtime-sidecar/adapters/eventbridge"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -52,7 +52,7 @@ func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
 		switch wrapper.DetailType {
 		case eventbridge.EventBridgeO5MessageDetailType:
 			outboxMessage := &messaging_pb.Message{}
-			if err := protojson.Unmarshal(wrapper.Detail, outboxMessage); err != nil {
+			if err := j5codec.Global.JSONToProto(wrapper.Detail, outboxMessage.ProtoReflect()); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal o5-message: %w", err)
 			}
 			return outboxMessage, nil
@@ -92,7 +92,7 @@ func ParseSQSMessage(msg types.Message) (*messaging_pb.Message, error) {
 	}
 
 	o5Wrapper := &messaging_pb.Message{}
-	if err := protojson.Unmarshal([]byte(*msg.Body), o5Wrapper); err == nil {
+	if err := j5codec.Global.JSONToProto([]byte(*msg.Body), o5Wrapper.ProtoReflect()); err == nil {
 		return o5Wrapper, nil
 	}
 

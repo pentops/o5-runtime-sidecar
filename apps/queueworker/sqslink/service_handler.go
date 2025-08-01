@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/pentops/j5/gen/j5/messaging/v1/messaging_j5pb"
+	"github.com/pentops/j5/lib/j5codec"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
 	"google.golang.org/grpc"
@@ -27,7 +28,7 @@ func messageHeader(message *messaging_pb.Message) (metadata.MD, error) {
 		SourceApp: message.SourceApp,
 		SourceEnv: message.SourceEnv,
 	}
-	causeJSON, err := protojson.Marshal(cause)
+	causeJSON, err := j5codec.Global.ProtoToJSON(cause.ProtoReflect())
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +113,7 @@ func (ss service) parseMessageBody(message *messaging_pb.Message) (proto.Message
 		}
 
 	case messaging_pb.WireEncoding_PROTOJSON:
-		if err := protojson.Unmarshal(body.Value, msg); err != nil {
+		if err := protojson.Unmarshal(body.Value, msg); err != nil { // nolint:forbidigo
 			return nil, fmt.Errorf("failed to unmarshal json: %w", err)
 		}
 
@@ -148,7 +149,7 @@ func setReplyTo(msg proto.Message, dest string) error {
 	refl := msg.ProtoReflect()
 	desc := refl.Descriptor()
 	fields := desc.Fields()
-	for i := 0; i < fields.Len(); i++ {
+	for i := range fields.Len() {
 		field := fields.Get(i)
 		if field.Kind() != protoreflect.MessageKind {
 			continue

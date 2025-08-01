@@ -8,9 +8,9 @@ import (
 	"net/http"
 
 	"github.com/pentops/j5/lib/proxy"
+	"github.com/pentops/jwtauth/httpjwt"
 	"github.com/pentops/jwtauth/jwks"
 	"github.com/pentops/log.go/log"
-	"github.com/pentops/o5-runtime-sidecar/apps/httpserver/jwtauth"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
 	"golang.org/x/sync/errgroup"
 
@@ -76,7 +76,7 @@ func NewRouter(config ServerConfig, app sidecar.AppInfo) (*Router, error) {
 		}
 
 		routerServer.jwks = jwksManager
-		globalAuth := proxy.AuthHeadersFunc(jwtauth.JWKSAuthFunc(jwksManager))
+		globalAuth := proxy.AuthHeadersFunc(httpjwt.JWKSAuthFunc(jwksManager))
 		routerServer.router.SetGlobalAuth(globalAuth)
 	}
 
