@@ -18,7 +18,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/pentops/flowtest v0.0.0-20250731234319-af76c17154d5
-	github.com/pentops/j5 v0.0.0-20250801001414-1e80c74bc9a9
+	github.com/pentops/j5 v0.0.0-20250801192111-61f853c07a23
 	github.com/pentops/jwtauth v0.0.0-20250715235155-a6d138b02514
 	github.com/pentops/log.go v0.0.16
 	github.com/pentops/o5-messaging v0.0.0-20250619024104-7e07c29129f0

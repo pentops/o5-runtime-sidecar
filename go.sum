@@ -125,8 +125,8 @@ github.com/pentops/flowtest v0.0.0-20250731234319-af76c17154d5 h1:1nf4K6hKdq1Ije
 github.com/pentops/flowtest v0.0.0-20250731234319-af76c17154d5/go.mod h1:vNp8crAKcH0f/sZU9frkmQLUeDsTIgMqV14kQtkAqC0=
 github.com/pentops/golib v0.0.0-20250326060930-8c83d58ddb63 h1:s5qtWT2/s79gy/wm3/bwvKYLK6u2AkW05JiLPqxraP0=
 github.com/pentops/golib v0.0.0-20250326060930-8c83d58ddb63/go.mod h1:I58JIVvL1/nP4CEHGKGbBhvWIEA9mVkGeoviemaqanU=
-github.com/pentops/j5 v0.0.0-20250801001414-1e80c74bc9a9 h1:vvOsz0GafjvrQy3RznJopbn5tIUOdm6r3d4QZAbjdtI=
-github.com/pentops/j5 v0.0.0-20250801001414-1e80c74bc9a9/go.mod h1:8L6k5+5uGYi366LhrEQxeW5qFvNE3niegfRy7/p+3Ew=
+github.com/pentops/j5 v0.0.0-20250801192111-61f853c07a23 h1:ZSurNJ4k+F5zDz1KUcATNO9ZD7hfwfQhfEfKHBBat14=
+github.com/pentops/j5 v0.0.0-20250801192111-61f853c07a23/go.mod h1:8L6k5+5uGYi366LhrEQxeW5qFvNE3niegfRy7/p+3Ew=
 github.com/pentops/jwtauth v0.0.0-20250715235155-a6d138b02514 h1:Yo9hsJLEJQAdXgOmIcg7LcUqP/qYYlKyeU6bhWlxMwQ=
 github.com/pentops/jwtauth v0.0.0-20250715235155-a6d138b02514/go.mod h1:KaLLUwdfdWIvO2DElgxl5PQmSqofj6s9KCEav2wfZcM=
 github.com/pentops/log.go v0.0.16 h1:oxCuHSBOBPjfUVSXyOSEEdYUwytysj4T29/7T2FBp9Q=
