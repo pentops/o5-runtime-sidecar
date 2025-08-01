@@ -18,7 +18,7 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/pentops/flowtest v0.0.0-20250731234319-af76c17154d5
-	github.com/pentops/j5 v0.0.0-20250731173316-13f5d06c7592
+	github.com/pentops/j5 v0.0.0-20250801001414-1e80c74bc9a9
 	github.com/pentops/jwtauth v0.0.0-20250715235155-a6d138b02514
 	github.com/pentops/log.go v0.0.16
 	github.com/pentops/o5-messaging v0.0.0-20250619024104-7e07c29129f0
@@ -44,7 +44,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.29.1 // indirect
 	github.com/aws/smithy-go v1.22.4 // indirect
-	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
@@ -56,7 +55,6 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
-	github.com/pentops/golib v0.0.0-20250326060930-8c83d58ddb63 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
