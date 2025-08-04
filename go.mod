@@ -18,10 +18,10 @@ require (
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/pentops/flowtest v0.0.0-20250731234319-af76c17154d5
-	github.com/pentops/j5 v0.0.0-20250801225841-c98cd3e324e8
+	github.com/pentops/j5 v0.0.0-20250804180511-490f30d7c098
 	github.com/pentops/jwtauth v0.0.0-20250802182320-3552e00686f1
 	github.com/pentops/log.go v0.0.16
-	github.com/pentops/o5-messaging v0.0.0-20250619024104-7e07c29129f0
+	github.com/pentops/o5-messaging v0.0.0-20250804192812-419352c5dd36
 	github.com/pentops/runner v0.0.0-20250619010747-2bb7a5385324
 	github.com/pressly/goose/v3 v3.24.3
 	github.com/rs/cors v1.11.1
