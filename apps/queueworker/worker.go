@@ -17,6 +17,7 @@ type WorkerConfig struct {
 
 type App struct {
 	queueWorker *sqslink.Worker
+	router      *sqslink.Router
 }
 
 type Publisher interface {
@@ -32,8 +33,12 @@ func NewApp(config WorkerConfig, info sidecar.AppInfo, publisher sqslink.Publish
 
 		dlh = sqslink.NewO5MessageDeadLetterHandler(publisher, info)
 	}
-	ww := sqslink.NewWorker(sqs, config.SQSURL, dlh, config.ResendChance)
+
+	router := sqslink.NewRouter()
+
+	ww := sqslink.NewWorker(sqs, config.SQSURL, dlh, config.ResendChance, router)
 	return &App{
+		router:      router,
 		queueWorker: ww,
 	}, nil
 
@@ -44,5 +49,5 @@ func (app *App) Run(ctx context.Context) error {
 }
 
 func (app *App) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker sqslink.AppLink) error {
-	return app.queueWorker.RegisterService(ctx, service, invoker)
+	return app.router.RegisterService(ctx, service, invoker)
 }

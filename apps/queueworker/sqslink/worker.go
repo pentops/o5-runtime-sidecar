@@ -14,7 +14,6 @@ import (
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
 	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/awsmsg"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 const RawMessageName = "/o5.messaging.v1.topic.RawMessageTopic/Raw"
@@ -64,19 +63,18 @@ func randomlySelected(ctx context.Context, pct int) bool {
 }
 
 type Worker struct {
-	router            *Router
+	router            Handler
 	resendChance      int
 	SQSClient         SQSAPI
 	QueueURL          string
 	deadLetterHandler DeadLetterHandler
 }
 
-func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int) *Worker {
-	router := NewRouter()
+func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int, handler Handler) *Worker {
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
-		router:            router,
+		router:            handler,
 		resendChance:      resendChance,
 		deadLetterHandler: deadLetters,
 	}
@@ -88,10 +86,6 @@ func (ww *Worker) Run(ctx context.Context) error {
 			return err
 		}
 	}
-}
-
-func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker AppLink) error {
-	return ww.router.RegisterService(ctx, service, invoker)
 }
 
 func (ww *Worker) FetchOnce(ctx context.Context) error {
