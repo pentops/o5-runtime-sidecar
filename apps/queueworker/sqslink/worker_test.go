@@ -5,11 +5,14 @@ import (
 	"testing"
 
 	"github.com/pentops/j5/gen/j5/messaging/v1/messaging_j5pb"
+	"github.com/pentops/j5/lib/j5codec"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/o5msg"
 	"github.com/pentops/o5-runtime-sidecar/testproto/gen/test/v1/test_tpb"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 func TestChance(t *testing.T) {
@@ -23,7 +26,7 @@ func TestChance(t *testing.T) {
 }
 
 func TestDynamicParse(t *testing.T) {
-	ww := NewWorker(nil, "https://test.com/queue", nil, 0)
+	ww := NewRouter(nil)
 
 	fd := test_tpb.File_test_v1_topic_test_p_j5s_proto.Services().Get(0)
 	if err := ww.RegisterService(context.Background(), fd, nil); err != nil {
@@ -56,21 +59,36 @@ func TestDynamicParse(t *testing.T) {
 	}
 }
 
+type encoderInvoker struct {
+	invoke func(context.Context, string, any, any, ...grpc.CallOption) error
+}
+
+func (ei encoderInvoker) Invoke(ctx context.Context, method string, req any, res any, opts ...grpc.CallOption) error {
+	return ei.invoke(ctx, method, req, res, opts...)
+}
+
+func (ei encoderInvoker) JSONToProto(body []byte, msg protoreflect.Message) error {
+	return j5codec.Global.JSONToProto(body, msg)
+}
+
 func TestRequestMetadata(t *testing.T) {
-	ww := NewWorker(nil, "https://test.com/queue", nil, 0)
+	ww := NewRouter(nil)
 
 	fd := test_tpb.File_test_v1_topic_test_p_j5s_proto.Services().ByName("TestReqResRequestTopic")
 	if fd == nil {
 		t.Fatal("no service found")
 	}
 
-	if err := ww.RegisterService(context.Background(), fd, nil); err != nil {
+	if err := ww.RegisterService(context.Background(), fd, encoderInvoker{}); err != nil {
 		t.Fatal(err.Error())
 	}
 
 	handler, ok := ww.handlers["/test.v1.topic.TestReqResRequestTopic/TestReqResRequest"].(*service)
 	if !ok || handler == nil {
 		t.Fatal("handler is nil")
+	}
+	if handler.invoker == nil {
+		t.Fatal("invoker is nil")
 	}
 
 	input := &test_tpb.TestReqResRequestMessage{

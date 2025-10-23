@@ -35,12 +35,7 @@ func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *messaging_pb.Messa
 	return hf(ctx, msg)
 }
 
-type Worker struct {
-	SQSClient         SQSAPI
-	QueueURL          string
-	deadLetterHandler DeadLetterHandler
-	resendChance      int
-
+type Router struct {
 	handlers        map[string]Handler
 	fallbackHandler Handler
 }
@@ -73,17 +68,32 @@ func randomlySelected(ctx context.Context, pct int) bool {
 	return false
 }
 
-func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int) *Worker {
-	return &Worker{
-		SQSClient:         sqs,
-		QueueURL:          queueURL,
-		handlers:          make(map[string]Handler),
-		deadLetterHandler: deadLetters,
-		resendChance:      resendChance,
+func NewRouter(deadLetters DeadLetterHandler) *Router {
+	return &Router{
+		handlers: make(map[string]Handler),
 	}
 }
 
-func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker AppLink) error {
+type Worker struct {
+	router            *Router
+	resendChance      int
+	SQSClient         SQSAPI
+	QueueURL          string
+	deadLetterHandler DeadLetterHandler
+}
+
+func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int) *Worker {
+	router := NewRouter(deadLetters)
+	return &Worker{
+		SQSClient:         sqs,
+		QueueURL:          queueURL,
+		router:            router,
+		resendChance:      resendChance,
+		deadLetterHandler: deadLetters,
+	}
+}
+
+func (ww *Router) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker AppLink) error {
 	methods := service.Methods()
 	for ii := 0; ii < methods.Len(); ii++ {
 		method := methods.Get(ii)
@@ -94,7 +104,7 @@ func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.Serv
 	return nil
 }
 
-func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker AppLink) error {
+func (ww *Router) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker AppLink) error {
 	serviceName := method.Parent().(protoreflect.ServiceDescriptor).FullName()
 	fullName := fmt.Sprintf("/%s/%s", serviceName, method.Name())
 
@@ -116,8 +126,37 @@ func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.Method
 	return nil
 }
 
-func (ww *Worker) RegisterHandler(fullMethod string, handler Handler) {
+func (ww *Router) RegisterHandler(fullMethod string, handler Handler) {
 	ww.handlers[fullMethod] = handler
+}
+
+type ErrNoHandlerMatched string
+
+func (e ErrNoHandlerMatched) Error() string {
+	return fmt.Sprintf("no handler matched for %q", string(e))
+}
+
+func (ww *Router) HandleMessage(ctx context.Context, parsed *messaging_pb.Message) error {
+	ctx = log.WithFields(ctx, map[string]any{
+		"grpc-service": parsed.GrpcService,
+		"grpc-method":  parsed.GrpcMethod,
+		"message-id":   parsed.MessageId,
+		"topic":        parsed.DestinationTopic,
+	})
+	log.Debug(ctx, "Message Handler: Begin")
+
+	fullServiceName := fmt.Sprintf("/%s/%s", parsed.GrpcService, parsed.GrpcMethod)
+	handler, ok := ww.handlers[fullServiceName]
+	if !ok {
+		if ww.fallbackHandler != nil {
+			log.Debug(ctx, "Message Handler: Using fallback handler")
+			handler = ww.fallbackHandler
+		} else {
+			return ErrNoHandlerMatched(fullServiceName)
+		}
+	}
+
+	return handler.HandleMessage(ctx, parsed)
 }
 
 func (ww *Worker) Run(ctx context.Context) error {
@@ -126,6 +165,10 @@ func (ww *Worker) Run(ctx context.Context) error {
 			return err
 		}
 	}
+}
+
+func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker AppLink) error {
+	return ww.router.RegisterService(ctx, service, invoker)
 }
 
 func (ww *Worker) FetchOnce(ctx context.Context) error {
@@ -196,40 +239,9 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		return
 	}
 
-	ctx = log.WithFields(ctx, map[string]any{
-		"grpc-service":   parsed.GrpcService,
-		"grpc-method":    parsed.GrpcMethod,
-		"message-id":     parsed.MessageId,
-		"topic":          parsed.DestinationTopic,
-		"sqs-message-id": msg.MessageId,
-	})
-	log.Debug(ctx, "Message Handler: Begin")
+	ctx = log.WithField(ctx, "sqs-message-id", msg.MessageId)
 
-	fullServiceName := fmt.Sprintf("/%s/%s", parsed.GrpcService, parsed.GrpcMethod)
-	handler, ok := ww.handlers[fullServiceName]
-	if !ok {
-		if ww.fallbackHandler != nil {
-			log.Debug(ctx, "Message Handler: Using fallback handler")
-			handler = ww.fallbackHandler
-		} else {
-			log.Error(ctx, "no handler matched")
-			if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
-				log.Error(ctx, "Error handling message, leaving in queue")
-				return
-			}
-			err := ww.killMessage(ctx, msg, parsed, fmt.Errorf("no handler for %s", fullServiceName))
-			if err != nil {
-				log.WithField(ctx, "killError", err.Error()).
-					Error("Message Worker: Error killing message, leaving in queue")
-				return
-			}
-			log.Debug(ctx, "Message Handler: Killed")
-			return
-		}
-	}
-
-	err = handler.HandleMessage(ctx, parsed)
-
+	err = ww.router.HandleMessage(ctx, parsed)
 	if err != nil {
 		ctx = log.WithError(ctx, err)
 		log.Error(ctx, "Message Handler: Error")
