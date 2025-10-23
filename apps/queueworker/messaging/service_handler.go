@@ -1,4 +1,4 @@
-package sqslink
+package messaging
 
 import (
 	"context"

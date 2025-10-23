@@ -45,7 +45,7 @@ func run(ctx context.Context, envConfig entrypoint.Config) error {
 		return fmt.Errorf("failed to create AWS config builder: %w", err)
 	}
 
-	runtime, err := entrypoint.FromConfig(envConfig, awsBuilder)
+	runtime, err := entrypoint.FromConfig(ctx, envConfig, awsBuilder)
 	if err != nil {
 		return fmt.Errorf("from config: %w", err)
 	}

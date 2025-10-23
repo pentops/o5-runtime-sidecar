@@ -14,28 +14,28 @@ import (
 
 type TestAWS struct{}
 
-func (ta TestAWS) SNS() SNSAPI {
-	return nil
+func (ta TestAWS) SNS(ctx context.Context) (SNSAPI, error) {
+	return nil, fmt.Errorf("Test Not Implemented")
 }
 
-func (ta TestAWS) SQS() SQSAPI {
-	return nil
+func (ta TestAWS) SQS(ctx context.Context) (SQSAPI, error) {
+	return nil, fmt.Errorf("Test Not Implemented")
 }
 
-func (ta TestAWS) EventBridge() EventBridgeAPI {
-	return nil
+func (ta TestAWS) EventBridge(ctx context.Context) (EventBridgeAPI, error) {
+	return nil, fmt.Errorf("Test Not Implemented")
 }
 
 func (ta TestAWS) Region() string {
 	return "local"
 }
 
-func (ta TestAWS) Credentials() aws.CredentialsProvider {
-	return nil
+func (ta TestAWS) Credentials(ctx context.Context) (aws.CredentialsProvider, error) {
+	return nil, fmt.Errorf("Test Not Implemented")
 }
 
 func TestLoader(t *testing.T) {
-	runtime, err := FromConfig(Config{}, TestAWS{})
+	runtime, err := FromConfig(t.Context(), Config{}, TestAWS{})
 	assert.NoError(t, err)
 
 	err = runtime.Run(context.Background())
@@ -49,7 +49,7 @@ func TestLoader(t *testing.T) {
 }
 
 func TestLoadEverything(t *testing.T) {
-	runtime, err := FromConfig(Config{
+	runtime, err := FromConfig(t.Context(), Config{
 		ServerConfig: httpserver.ServerConfig{
 			PublicAddr:  ":0",
 			CORSOrigins: []string{"*"},
@@ -63,7 +63,7 @@ func TestLoadEverything(t *testing.T) {
 		exitErr <- err
 	}()
 
-	httpAddr := runtime.routerServer.Addr()
+	httpAddr := runtime.serviceRouter.Addr()
 	t.Logf("HTTP Addr: %s", httpAddr)
 
 	t.Run("HTTP CORS", func(t *testing.T) {

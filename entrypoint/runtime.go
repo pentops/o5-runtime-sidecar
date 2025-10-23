@@ -15,6 +15,7 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/apps/pgoutbox"
 	"github.com/pentops/o5-runtime-sidecar/apps/pgproxy"
 	"github.com/pentops/o5-runtime-sidecar/apps/queueworker"
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/messaging"
 	"github.com/pentops/runner"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -27,7 +28,8 @@ type Runtime struct {
 
 	queueWorker     *queueworker.App
 	adapter         *bridge.App
-	routerServer    *httpserver.Router
+	queueRouter     *messaging.Router
+	serviceRouter   *httpserver.Router
 	outboxListeners []*pgoutbox.App
 	postgresProxy   *pgproxy.App
 
@@ -106,11 +108,11 @@ func (rt *Runtime) Run(ctx context.Context) error {
 
 	<-rt.endpointWait
 
-	if rt.routerServer != nil {
+	if rt.serviceRouter != nil {
 		// TODO: Metrics
 		didAnything = true
 
-		runGroup.Add("router", rt.routerServer.Run)
+		runGroup.Add("router", rt.serviceRouter.Run)
 
 	}
 
@@ -152,20 +154,20 @@ func (rt *Runtime) registerEndpoint(ctx context.Context, prClient *grpcreflect.R
 
 		switch {
 		case strings.HasSuffix(name, "Service"), strings.HasSuffix(name, "Sandbox"):
-			if rt.routerServer == nil {
+			if rt.serviceRouter == nil {
 				return fmt.Errorf("service %s requires a public port", name)
 			}
 
-			if err := rt.routerServer.RegisterService(ctx, s, prClient); err != nil {
+			if err := rt.serviceRouter.RegisterService(ctx, s, prClient); err != nil {
 				return fmt.Errorf("register service %s: %w", name, err)
 			}
 
 		case strings.HasSuffix(name, "Topic"):
-			if rt.queueWorker == nil {
+			if rt.queueRouter == nil {
 				return fmt.Errorf("topic %s requires an SQS URL", name)
 			}
 
-			if err := rt.queueWorker.RegisterService(ctx, s, prClient); err != nil {
+			if err := rt.queueRouter.RegisterService(ctx, s, prClient); err != nil {
 				return fmt.Errorf("register worker %s: %w", name, err)
 			}
 

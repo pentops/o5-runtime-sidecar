@@ -1,10 +1,8 @@
-package sqslink
+package sqsmsg
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -13,111 +11,30 @@ import (
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
-	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/awsmsg"
-	"google.golang.org/protobuf/reflect/protoreflect"
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/messaging"
 )
 
 const RawMessageName = "/o5.messaging.v1.topic.RawMessageTopic/Raw"
-const GenericTopic = "/o5.messaging.v1.topic.GenericMessageTopic/Generic"
 
 type SQSAPI interface {
 	ReceiveMessage(ctx context.Context, input *sqs.ReceiveMessageInput, opts ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
 	DeleteMessage(ctx context.Context, input *sqs.DeleteMessageInput, opts ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
 }
 
-type Handler interface {
-	HandleMessage(context.Context, *messaging_pb.Message) error
-}
-
-type HandlerFunc func(context.Context, *messaging_pb.Message) error
-
-func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *messaging_pb.Message) error {
-	return hf(ctx, msg)
-}
-
 type Worker struct {
+	router            messaging.Handler
 	SQSClient         SQSAPI
 	QueueURL          string
-	deadLetterHandler DeadLetterHandler
-	resendChance      int
-
-	handlers        map[string]Handler
-	fallbackHandler Handler
+	deadLetterHandler messaging.DeadLetterHandler
 }
 
-// Is this message is randomly selected based on percent received?
-func randomlySelected(ctx context.Context, pct int) bool {
-	if pct == 0 {
-		return false
-	}
-
-	if pct == 100 {
-		return true
-	}
-
-	if pct > 100 || pct < 0 {
-		log.Infof(ctx, "Received invalid percent for randomly selecting a message: %v", pct)
-		return false
-	}
-
-	r, err := rand.Int(rand.Reader, big.NewInt(100))
-	if err != nil {
-		log.WithError(ctx, err).Error("couldn't generate random number for selecting message")
-		return false
-	}
-
-	if r.Int64() <= big.NewInt(int64(pct)).Int64() {
-		log.Infof(ctx, "Message randomly selected: rand of %v and percent of %v", r.Int64(), pct)
-		return true
-	}
-	return false
-}
-
-func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int) *Worker {
+func NewWorker(sqs SQSAPI, queueURL string, deadLetters messaging.DeadLetterHandler, handler messaging.Handler) *Worker {
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
-		handlers:          make(map[string]Handler),
+		router:            handler,
 		deadLetterHandler: deadLetters,
-		resendChance:      resendChance,
 	}
-}
-
-func (ww *Worker) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker AppLink) error {
-	methods := service.Methods()
-	for ii := 0; ii < methods.Len(); ii++ {
-		method := methods.Get(ii)
-		if err := ww.registerMethod(ctx, method, invoker); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (ww *Worker) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker AppLink) error {
-	serviceName := method.Parent().(protoreflect.ServiceDescriptor).FullName()
-	fullName := fmt.Sprintf("/%s/%s", serviceName, method.Name())
-
-	if fullName == GenericTopic {
-		log.WithField(ctx, "service", fullName).Info("Registering Generic Fallback")
-		ww.fallbackHandler = &genericHandler{
-			invoker: invoker,
-		}
-
-	} else {
-		log.WithField(ctx, "service", fullName).Info("Registering Worker Service")
-		ss := &service{
-			requestMessage: method.Input(),
-			fullName:       fullName,
-			invoker:        invoker,
-		}
-		ww.handlers[ss.fullName] = ss
-	}
-	return nil
-}
-
-func (ww *Worker) RegisterHandler(fullMethod string, handler Handler) {
-	ww.handlers[fullMethod] = handler
 }
 
 func (ww *Worker) Run(ctx context.Context) error {
@@ -143,7 +60,7 @@ func (ww *Worker) FetchOnce(ctx context.Context) error {
 		// retrieve requests after being retrieved by a ReceiveMessage request.
 		VisibilityTimeout: 30,
 
-		MessageAttributeNames: awsmsg.SQSMessageAttributes,
+		MessageAttributeNames: SQSMessageAttributes,
 
 		AttributeNames: []types.QueueAttributeName{
 			// this type conversion is probably a bug in the SDK
@@ -156,9 +73,6 @@ func (ww *Worker) FetchOnce(ctx context.Context) error {
 
 	for _, msg := range out.Messages {
 		ww.handleMessage(ctx, msg)
-		if randomlySelected(ctx, ww.resendChance) {
-			ww.handleMessage(ctx, msg)
-		}
 	}
 	return nil
 }
@@ -177,7 +91,7 @@ func getReceiveCount(msg types.Message) int {
 }
 
 func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
-	parsed, err := awsmsg.ParseSQSMessage(msg)
+	parsed, err := ParseSQSMessage(msg)
 	if err != nil {
 		// Leave it for retry unless we keep failing at parsing it
 		log.WithError(ctx, err).Error("Message Worker: Failed to parse message")
@@ -196,40 +110,9 @@ func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
 		return
 	}
 
-	ctx = log.WithFields(ctx, map[string]any{
-		"grpc-service":   parsed.GrpcService,
-		"grpc-method":    parsed.GrpcMethod,
-		"message-id":     parsed.MessageId,
-		"topic":          parsed.DestinationTopic,
-		"sqs-message-id": msg.MessageId,
-	})
-	log.Debug(ctx, "Message Handler: Begin")
+	ctx = log.WithField(ctx, "sqs-message-id", msg.MessageId)
 
-	fullServiceName := fmt.Sprintf("/%s/%s", parsed.GrpcService, parsed.GrpcMethod)
-	handler, ok := ww.handlers[fullServiceName]
-	if !ok {
-		if ww.fallbackHandler != nil {
-			log.Debug(ctx, "Message Handler: Using fallback handler")
-			handler = ww.fallbackHandler
-		} else {
-			log.Error(ctx, "no handler matched")
-			if ww.deadLetterHandler == nil && getReceiveCount(msg) <= 3 {
-				log.Error(ctx, "Error handling message, leaving in queue")
-				return
-			}
-			err := ww.killMessage(ctx, msg, parsed, fmt.Errorf("no handler for %s", fullServiceName))
-			if err != nil {
-				log.WithField(ctx, "killError", err.Error()).
-					Error("Message Worker: Error killing message, leaving in queue")
-				return
-			}
-			log.Debug(ctx, "Message Handler: Killed")
-			return
-		}
-	}
-
-	err = handler.HandleMessage(ctx, parsed)
-
+	err = ww.router.HandleMessage(ctx, parsed)
 	if err != nil {
 		ctx = log.WithError(ctx, err)
 		log.Error(ctx, "Message Handler: Error")

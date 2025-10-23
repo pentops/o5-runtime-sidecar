@@ -29,7 +29,7 @@ func looksLikeJSONString(name string) bool {
 var reValidDBEnvName = regexp.MustCompile(`^[A-Z0-9_]+$`)
 
 type AWSProvider interface {
-	Credentials() aws.CredentialsProvider
+	Credentials(context.Context) (aws.CredentialsProvider, error)
 	Region() string
 }
 
@@ -82,7 +82,7 @@ func (ss *pgConnSet) aurora(name string, config *AuroraConfig) (PGConnector, err
 	}
 
 	if ss.credBuilder == nil {
-		ss.credBuilder = NewCredBuilder(ss.awsProvider.Credentials(), ss.awsProvider.Region())
+		ss.credBuilder = NewCredBuilder(ss.awsProvider)
 	}
 
 	if err := ss.credBuilder.AddConfig(name, config); err != nil {

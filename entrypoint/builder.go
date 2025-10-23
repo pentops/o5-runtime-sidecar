@@ -1,6 +1,7 @@
 package entrypoint
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pentops/o5-runtime-sidecar/adapters/eventbridge"
@@ -11,6 +12,7 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/apps/pgoutbox"
 	"github.com/pentops/o5-runtime-sidecar/apps/pgproxy"
 	"github.com/pentops/o5-runtime-sidecar/apps/queueworker"
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/messaging"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
 )
 
@@ -35,7 +37,7 @@ type Publisher interface {
 	queueworker.Publisher
 }
 
-func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
+func FromConfig(ctx context.Context, envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	srcConfig := sidecar.AppInfo{
 		SourceApp:      envConfig.AppName,
 		SourceEnv:      envConfig.EnvironmentName,
@@ -47,7 +49,11 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 	runtime.msgConverter = msgconvert.NewConverter(srcConfig)
 
 	if envConfig.EventBridgeConfig.BusARN != "" {
-		s, err := eventbridge.NewEventBridgePublisher(awsConfig.EventBridge(), envConfig.EventBridgeConfig)
+		eventBridge, err := awsConfig.EventBridge(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting eventbridge client: %w", err)
+		}
+		s, err := eventbridge.NewEventBridgePublisher(eventBridge, envConfig.EventBridgeConfig)
 		if err != nil {
 			return nil, fmt.Errorf("creating eventbridge publisher: %w", err)
 		}
@@ -83,7 +89,15 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 
 	// Subscribe to SQS messages
 	if envConfig.WorkerConfig.SQSURL != "" {
-		w, err := queueworker.NewApp(envConfig.WorkerConfig, srcConfig, runtime.sender, awsConfig.SQS())
+		sqs, err := awsConfig.SQS(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		router := messaging.NewRouter()
+		runtime.queueRouter = router
+
+		w, err := queueworker.NewApp(envConfig.WorkerConfig, srcConfig, runtime.sender, sqs, router)
 		if err != nil {
 			return nil, fmt.Errorf("creating queue worker: %w", err)
 		}
@@ -107,7 +121,7 @@ func FromConfig(envConfig Config, awsConfig AWSProvider) (*Runtime, error) {
 			return nil, fmt.Errorf("creating router: %w", err)
 		}
 
-		runtime.routerServer = r
+		runtime.serviceRouter = r
 	}
 
 	return runtime, nil
