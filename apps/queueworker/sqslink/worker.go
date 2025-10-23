@@ -62,20 +62,42 @@ func randomlySelected(ctx context.Context, pct int) bool {
 	return false
 }
 
+type ResendHandler struct {
+	resendChance int
+	handler      Handler
+}
+
+func NewResendHandler(handler Handler, resendChance int) *ResendHandler {
+	return &ResendHandler{
+		handler:      handler,
+		resendChance: resendChance,
+	}
+}
+
+func (ww *ResendHandler) HandleMessage(ctx context.Context, msg *messaging_pb.Message) error {
+	if err := ww.handler.HandleMessage(ctx, msg); err != nil {
+		return err
+	}
+	if randomlySelected(ctx, ww.resendChance) {
+		if err := ww.handler.HandleMessage(ctx, msg); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type Worker struct {
 	router            Handler
-	resendChance      int
 	SQSClient         SQSAPI
 	QueueURL          string
 	deadLetterHandler DeadLetterHandler
 }
 
-func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int, handler Handler) *Worker {
+func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, handler Handler) *Worker {
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
 		router:            handler,
-		resendChance:      resendChance,
 		deadLetterHandler: deadLetters,
 	}
 }
@@ -116,9 +138,6 @@ func (ww *Worker) FetchOnce(ctx context.Context) error {
 
 	for _, msg := range out.Messages {
 		ww.handleMessage(ctx, msg)
-		if randomlySelected(ctx, ww.resendChance) {
-			ww.handleMessage(ctx, msg)
-		}
 	}
 	return nil
 }

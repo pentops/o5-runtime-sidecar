@@ -35,8 +35,12 @@ func NewApp(config WorkerConfig, info sidecar.AppInfo, publisher sqslink.Publish
 	}
 
 	router := sqslink.NewRouter()
+	var handler sqslink.Handler = router
+	if config.ResendChance > 0 {
+		handler = sqslink.NewResendHandler(router, config.ResendChance)
+	}
 
-	ww := sqslink.NewWorker(sqs, config.SQSURL, dlh, config.ResendChance, router)
+	ww := sqslink.NewWorker(sqs, config.SQSURL, dlh, handler)
 	return &App{
 		router:      router,
 		queueWorker: ww,
