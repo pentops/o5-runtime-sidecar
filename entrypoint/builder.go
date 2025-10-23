@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/pentops/o5-runtime-sidecar/adapters/amqp"
 	"github.com/pentops/o5-runtime-sidecar/adapters/eventbridge"
 	"github.com/pentops/o5-runtime-sidecar/adapters/msgconvert"
 	"github.com/pentops/o5-runtime-sidecar/adapters/pgclient"
@@ -28,6 +29,7 @@ type Config struct {
 	OutboxConfig      pgoutbox.OutboxConfig
 	BridgeConfig      bridge.BridgeConfig
 	EventBridgeConfig eventbridge.EventBridgeConfig
+	AMQPConfig        amqp.AMQPConfig
 
 	ServiceEndpoints []string `env:"SERVICE_ENDPOINT" default:""`
 }
@@ -48,6 +50,7 @@ func FromConfig(ctx context.Context, envConfig Config, awsConfig AWSProvider) (*
 	runtime.endpoints = envConfig.ServiceEndpoints
 	runtime.msgConverter = msgconvert.NewConverter(srcConfig)
 
+	// Publish to EventBridge
 	if envConfig.EventBridgeConfig.BusARN != "" {
 		eventBridge, err := awsConfig.EventBridge(ctx)
 		if err != nil {
@@ -59,6 +62,57 @@ func FromConfig(ctx context.Context, envConfig Config, awsConfig AWSProvider) (*
 		}
 
 		runtime.sender = s
+	}
+
+	// Subscribe to SQS messages
+	if envConfig.WorkerConfig.SQSURL != "" {
+		sqs, err := awsConfig.SQS(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		router := messaging.NewRouter()
+		runtime.queueRouter = router
+
+		w, err := queueworker.NewApp(envConfig.WorkerConfig, srcConfig, runtime.sender, sqs, router)
+		if err != nil {
+			return nil, fmt.Errorf("creating queue worker: %w", err)
+		}
+
+		runtime.queueWorker = w
+	}
+
+	if envConfig.AMQPConfig.URI != "" {
+		if runtime.sender != nil {
+			return nil, fmt.Errorf("cannot set both AMQP_URI and EVENTBRIDGE_ARN")
+		}
+		if runtime.queueWorker != nil {
+			return nil, fmt.Errorf("cannot set both AMQP_URI and SQS_URL")
+		}
+
+		conn, err := amqp.NewConnection(envConfig.AMQPConfig, envConfig.EnvironmentName)
+		if err != nil {
+			return nil, fmt.Errorf("creating amqp connection: %w", err)
+		}
+
+		publisher, err := amqp.NewPublisher(conn)
+		if err != nil {
+			return nil, fmt.Errorf("creating amqp publisher: %w", err)
+		}
+		runtime.sender = publisher
+
+		router := messaging.NewRouter()
+		runtime.queueRouter = router
+
+		worker, err := amqp.NewSubscriber(conn, envConfig.AMQPConfig.Queue, router)
+		if err != nil {
+			return nil, fmt.Errorf("creating amqp publisher: %w", err)
+		}
+
+		runtime.queueWorker = worker
+
+	} else if len(envConfig.AMQPConfig.Queue) > 0 {
+		return nil, fmt.Errorf("AMQP_QUEUES set but AMQP_URI is empty")
 	}
 
 	pgConfigs := pgclient.NewConnectorSet(awsConfig, pgclient.EnvProvider{})
@@ -85,24 +139,6 @@ func FromConfig(ctx context.Context, envConfig Config, awsConfig AWSProvider) (*
 		}
 
 		runtime.postgresProxy = p
-	}
-
-	// Subscribe to SQS messages
-	if envConfig.WorkerConfig.SQSURL != "" {
-		sqs, err := awsConfig.SQS(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		router := messaging.NewRouter()
-		runtime.queueRouter = router
-
-		w, err := queueworker.NewApp(envConfig.WorkerConfig, srcConfig, runtime.sender, sqs, router)
-		if err != nil {
-			return nil, fmt.Errorf("creating queue worker: %w", err)
-		}
-
-		runtime.queueWorker = w
 	}
 
 	// Serve an internal gRPC server, for the app to use messaging without an outbox
