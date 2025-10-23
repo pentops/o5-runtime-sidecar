@@ -24,6 +24,7 @@ require (
 	github.com/pentops/o5-messaging v0.0.0-20250804192812-419352c5dd36
 	github.com/pentops/runner v0.0.0-20250619010747-2bb7a5385324
 	github.com/pressly/goose/v3 v3.24.3
+	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/rs/cors v1.11.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/sync v0.16.0

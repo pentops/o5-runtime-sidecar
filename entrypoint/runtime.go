@@ -14,7 +14,6 @@ import (
 	"github.com/pentops/o5-runtime-sidecar/apps/httpserver"
 	"github.com/pentops/o5-runtime-sidecar/apps/pgoutbox"
 	"github.com/pentops/o5-runtime-sidecar/apps/pgproxy"
-	"github.com/pentops/o5-runtime-sidecar/apps/queueworker"
 	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/messaging"
 	"github.com/pentops/runner"
 	"google.golang.org/grpc"
@@ -23,10 +22,14 @@ import (
 
 var ErrNothingToDo = errors.New("no services configured")
 
-type Runtime struct {
-	sender Publisher
+type Runner interface {
+	Run(ctx context.Context) error
+}
 
-	queueWorker     *queueworker.App
+type Runtime struct {
+	sender      Publisher
+	queueWorker Runner //*queueworker.App
+
 	adapter         *bridge.App
 	queueRouter     *messaging.Router
 	serviceRouter   *httpserver.Router
@@ -81,6 +84,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 	runGroup.Add("register-endpoints", func(ctx context.Context) error {
 		defer close(rt.endpointWait)
 		for _, endpoint := range rt.endpoints {
+			ctx := log.WithField(ctx, "endpoint", endpoint)
 			prClient, err := rt.connectEndpoint(endpoint)
 			if err != nil {
 				return fmt.Errorf("connect to endpoint %s: %w", endpoint, err)
@@ -137,7 +141,7 @@ func (rt *Runtime) Run(ctx context.Context) error {
 func (rt *Runtime) connectEndpoint(endpoint string) (*grpcreflect.ReflectionClient, error) {
 	conn, err := grpc.NewClient(endpoint, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
-		return nil, fmt.Errorf("dial: %w", err)
+		return nil, fmt.Errorf("dial: %s: %w", endpoint, err)
 	}
 
 	return grpcreflect.NewClient(conn), nil
