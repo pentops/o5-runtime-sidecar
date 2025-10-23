@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/sqslink"
+	"github.com/pentops/o5-runtime-sidecar/adapters/sqsmsg"
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/messaging"
 	"github.com/pentops/o5-runtime-sidecar/sidecar"
-	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 type WorkerConfig struct {
@@ -16,33 +16,29 @@ type WorkerConfig struct {
 }
 
 type App struct {
-	queueWorker *sqslink.Worker
-	router      *sqslink.Router
+	queueWorker *sqsmsg.Worker
 }
 
 type Publisher interface {
-	sqslink.Publisher
+	messaging.Publisher
 }
 
-func NewApp(config WorkerConfig, info sidecar.AppInfo, publisher sqslink.Publisher, sqs sqslink.SQSAPI) (*App, error) {
-	var dlh sqslink.DeadLetterHandler
+func NewApp(config WorkerConfig, info sidecar.AppInfo, publisher messaging.Publisher, sqs sqsmsg.SQSAPI, handler messaging.Handler) (*App, error) {
+	var dlh messaging.DeadLetterHandler
 	if !config.NoDeadLetters {
 		if publisher == nil {
 			return nil, fmt.Errorf("SQS queue worker requires a sender for dead letters (set EVENTBRIDGE_ARN)")
 		}
 
-		dlh = sqslink.NewO5MessageDeadLetterHandler(publisher, info)
+		dlh = messaging.NewO5MessageDeadLetterHandler(publisher, info)
 	}
 
-	router := sqslink.NewRouter()
-	var handler sqslink.Handler = router
 	if config.ResendChance > 0 {
-		handler = sqslink.NewResendHandler(router, config.ResendChance)
+		handler = messaging.NewResendHandler(handler, config.ResendChance)
 	}
 
-	ww := sqslink.NewWorker(sqs, config.SQSURL, dlh, handler)
+	ww := sqsmsg.NewWorker(sqs, config.SQSURL, dlh, handler)
 	return &App{
-		router:      router,
 		queueWorker: ww,
 	}, nil
 
@@ -50,8 +46,4 @@ func NewApp(config WorkerConfig, info sidecar.AppInfo, publisher sqslink.Publish
 
 func (app *App) Run(ctx context.Context) error {
 	return app.queueWorker.Run(ctx)
-}
-
-func (app *App) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker sqslink.AppLink) error {
-	return app.router.RegisterService(ctx, service, invoker)
 }

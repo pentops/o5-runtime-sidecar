@@ -1,4 +1,4 @@
-package awsmsg
+package sqsmsg
 
 import (
 	"bytes"

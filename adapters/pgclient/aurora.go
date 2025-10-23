@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 )
 
@@ -38,16 +37,17 @@ func (ac *auroraConnector) DSN(ctx context.Context) (string, error) {
 }
 
 type CredBuilder struct {
-	creds   aws.CredentialsProvider
+	//creds    aws.CredentialsProvider
 	configs map[string]*AuroraConfig
-	region  string
+	//region   string
+	provider AWSProvider
 }
 
-func NewCredBuilder(creds aws.CredentialsProvider, region string) *CredBuilder {
+// func NewCredBuilder(creds aws.CredentialsProvider, region string) *CredBuilder {
+func NewCredBuilder(provider AWSProvider) *CredBuilder {
 	cb := &CredBuilder{
-		creds:   creds,
-		region:  region,
-		configs: make(map[string]*AuroraConfig),
+		provider: provider,
+		configs:  make(map[string]*AuroraConfig),
 	}
 
 	return cb
@@ -105,8 +105,14 @@ func (cb *CredBuilder) NewToken(ctx context.Context, lookupName string) (string,
 }
 
 func (cb *CredBuilder) newToken(ctx context.Context, config *AuroraConfig) (string, error) {
+	region := cb.provider.Region()
+	creds, err := cb.provider.Credentials(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get aws credentials: %w", err)
+	}
+
 	authenticationToken, err := auth.BuildAuthToken(
-		ctx, fmt.Sprintf("%s:%d", config.Endpoint, config.Port), cb.region, config.DBUser, cb.creds)
+		ctx, fmt.Sprintf("%s:%d", config.Endpoint, config.Port), region, config.DBUser, creds)
 	if err != nil {
 		return "", fmt.Errorf("failed to create authentication token: %w", err)
 	}

@@ -1,4 +1,4 @@
-package sqslink
+package messaging
 
 import (
 	"context"
@@ -9,10 +9,22 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+const GenericTopic = "/o5.messaging.v1.topic.GenericMessageTopic/Generic"
+
 type ErrNoHandlerMatched string
 
 func (e ErrNoHandlerMatched) Error() string {
 	return fmt.Sprintf("no handler matched for %q", string(e))
+}
+
+type Handler interface {
+	HandleMessage(context.Context, *messaging_pb.Message) error
+}
+
+type HandlerFunc func(context.Context, *messaging_pb.Message) error
+
+func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *messaging_pb.Message) error {
+	return hf(ctx, msg)
 }
 
 type Router struct {

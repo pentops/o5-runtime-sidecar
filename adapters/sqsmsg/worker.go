@@ -1,10 +1,8 @@
-package sqslink
+package sqsmsg
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"strconv"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -13,87 +11,24 @@ import (
 	"github.com/pentops/log.go/log"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_pb"
 	"github.com/pentops/o5-messaging/gen/o5/messaging/v1/messaging_tpb"
-	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/awsmsg"
+	"github.com/pentops/o5-runtime-sidecar/apps/queueworker/messaging"
 )
 
 const RawMessageName = "/o5.messaging.v1.topic.RawMessageTopic/Raw"
-const GenericTopic = "/o5.messaging.v1.topic.GenericMessageTopic/Generic"
 
 type SQSAPI interface {
 	ReceiveMessage(ctx context.Context, input *sqs.ReceiveMessageInput, opts ...func(*sqs.Options)) (*sqs.ReceiveMessageOutput, error)
 	DeleteMessage(ctx context.Context, input *sqs.DeleteMessageInput, opts ...func(*sqs.Options)) (*sqs.DeleteMessageOutput, error)
 }
 
-type Handler interface {
-	HandleMessage(context.Context, *messaging_pb.Message) error
-}
-
-type HandlerFunc func(context.Context, *messaging_pb.Message) error
-
-func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *messaging_pb.Message) error {
-	return hf(ctx, msg)
-}
-
-// Is this message is randomly selected based on percent received?
-func randomlySelected(ctx context.Context, pct int) bool {
-	if pct == 0 {
-		return false
-	}
-
-	if pct == 100 {
-		return true
-	}
-
-	if pct > 100 || pct < 0 {
-		log.Infof(ctx, "Received invalid percent for randomly selecting a message: %v", pct)
-		return false
-	}
-
-	r, err := rand.Int(rand.Reader, big.NewInt(100))
-	if err != nil {
-		log.WithError(ctx, err).Error("couldn't generate random number for selecting message")
-		return false
-	}
-
-	if r.Int64() <= big.NewInt(int64(pct)).Int64() {
-		log.Infof(ctx, "Message randomly selected: rand of %v and percent of %v", r.Int64(), pct)
-		return true
-	}
-	return false
-}
-
-type ResendHandler struct {
-	resendChance int
-	handler      Handler
-}
-
-func NewResendHandler(handler Handler, resendChance int) *ResendHandler {
-	return &ResendHandler{
-		handler:      handler,
-		resendChance: resendChance,
-	}
-}
-
-func (ww *ResendHandler) HandleMessage(ctx context.Context, msg *messaging_pb.Message) error {
-	if err := ww.handler.HandleMessage(ctx, msg); err != nil {
-		return err
-	}
-	if randomlySelected(ctx, ww.resendChance) {
-		if err := ww.handler.HandleMessage(ctx, msg); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 type Worker struct {
-	router            Handler
+	router            messaging.Handler
 	SQSClient         SQSAPI
 	QueueURL          string
-	deadLetterHandler DeadLetterHandler
+	deadLetterHandler messaging.DeadLetterHandler
 }
 
-func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, handler Handler) *Worker {
+func NewWorker(sqs SQSAPI, queueURL string, deadLetters messaging.DeadLetterHandler, handler messaging.Handler) *Worker {
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
@@ -125,7 +60,7 @@ func (ww *Worker) FetchOnce(ctx context.Context) error {
 		// retrieve requests after being retrieved by a ReceiveMessage request.
 		VisibilityTimeout: 30,
 
-		MessageAttributeNames: awsmsg.SQSMessageAttributes,
+		MessageAttributeNames: SQSMessageAttributes,
 
 		AttributeNames: []types.QueueAttributeName{
 			// this type conversion is probably a bug in the SDK
@@ -156,7 +91,7 @@ func getReceiveCount(msg types.Message) int {
 }
 
 func (ww *Worker) handleMessage(ctx context.Context, msg types.Message) {
-	parsed, err := awsmsg.ParseSQSMessage(msg)
+	parsed, err := ParseSQSMessage(msg)
 	if err != nil {
 		// Leave it for retry unless we keep failing at parsing it
 		log.WithError(ctx, err).Error("Message Worker: Failed to parse message")
