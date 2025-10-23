@@ -26,7 +26,7 @@ func TestChance(t *testing.T) {
 }
 
 func TestDynamicParse(t *testing.T) {
-	ww := NewRouter(nil)
+	ww := NewRouter()
 
 	fd := test_tpb.File_test_v1_topic_test_p_j5s_proto.Services().Get(0)
 	if err := ww.RegisterService(context.Background(), fd, nil); err != nil {
@@ -72,7 +72,7 @@ func (ei encoderInvoker) JSONToProto(body []byte, msg protoreflect.Message) erro
 }
 
 func TestRequestMetadata(t *testing.T) {
-	ww := NewRouter(nil)
+	ww := NewRouter()
 
 	fd := test_tpb.File_test_v1_topic_test_p_j5s_proto.Services().ByName("TestReqResRequestTopic")
 	if fd == nil {

@@ -35,11 +35,6 @@ func (hf HandlerFunc) HandleMessage(ctx context.Context, msg *messaging_pb.Messa
 	return hf(ctx, msg)
 }
 
-type Router struct {
-	handlers        map[string]Handler
-	fallbackHandler Handler
-}
-
 // Is this message is randomly selected based on percent received?
 func randomlySelected(ctx context.Context, pct int) bool {
 	if pct == 0 {
@@ -68,12 +63,6 @@ func randomlySelected(ctx context.Context, pct int) bool {
 	return false
 }
 
-func NewRouter(deadLetters DeadLetterHandler) *Router {
-	return &Router{
-		handlers: make(map[string]Handler),
-	}
-}
-
 type Worker struct {
 	router            *Router
 	resendChance      int
@@ -83,7 +72,7 @@ type Worker struct {
 }
 
 func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resendChance int) *Worker {
-	router := NewRouter(deadLetters)
+	router := NewRouter()
 	return &Worker{
 		SQSClient:         sqs,
 		QueueURL:          queueURL,
@@ -91,72 +80,6 @@ func NewWorker(sqs SQSAPI, queueURL string, deadLetters DeadLetterHandler, resen
 		resendChance:      resendChance,
 		deadLetterHandler: deadLetters,
 	}
-}
-
-func (ww *Router) RegisterService(ctx context.Context, service protoreflect.ServiceDescriptor, invoker AppLink) error {
-	methods := service.Methods()
-	for ii := 0; ii < methods.Len(); ii++ {
-		method := methods.Get(ii)
-		if err := ww.registerMethod(ctx, method, invoker); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (ww *Router) registerMethod(ctx context.Context, method protoreflect.MethodDescriptor, invoker AppLink) error {
-	serviceName := method.Parent().(protoreflect.ServiceDescriptor).FullName()
-	fullName := fmt.Sprintf("/%s/%s", serviceName, method.Name())
-
-	if fullName == GenericTopic {
-		log.WithField(ctx, "service", fullName).Info("Registering Generic Fallback")
-		ww.fallbackHandler = &genericHandler{
-			invoker: invoker,
-		}
-
-	} else {
-		log.WithField(ctx, "service", fullName).Info("Registering Worker Service")
-		ss := &service{
-			requestMessage: method.Input(),
-			fullName:       fullName,
-			invoker:        invoker,
-		}
-		ww.handlers[ss.fullName] = ss
-	}
-	return nil
-}
-
-func (ww *Router) RegisterHandler(fullMethod string, handler Handler) {
-	ww.handlers[fullMethod] = handler
-}
-
-type ErrNoHandlerMatched string
-
-func (e ErrNoHandlerMatched) Error() string {
-	return fmt.Sprintf("no handler matched for %q", string(e))
-}
-
-func (ww *Router) HandleMessage(ctx context.Context, parsed *messaging_pb.Message) error {
-	ctx = log.WithFields(ctx, map[string]any{
-		"grpc-service": parsed.GrpcService,
-		"grpc-method":  parsed.GrpcMethod,
-		"message-id":   parsed.MessageId,
-		"topic":        parsed.DestinationTopic,
-	})
-	log.Debug(ctx, "Message Handler: Begin")
-
-	fullServiceName := fmt.Sprintf("/%s/%s", parsed.GrpcService, parsed.GrpcMethod)
-	handler, ok := ww.handlers[fullServiceName]
-	if !ok {
-		if ww.fallbackHandler != nil {
-			log.Debug(ctx, "Message Handler: Using fallback handler")
-			handler = ww.fallbackHandler
-		} else {
-			return ErrNoHandlerMatched(fullServiceName)
-		}
-	}
-
-	return handler.HandleMessage(ctx, parsed)
 }
 
 func (ww *Worker) Run(ctx context.Context) error {
