@@ -30,6 +30,7 @@ type ServerConfig struct {
 	JWKS        []string `env:"JWKS" default:""`
 	StaticFiles string   `env:"STATIC_FILES" default:""`
 	CORSOrigins []string `env:"CORS_ORIGINS" default:""`
+	InjectActor string   `env:"INJECT_ACTOR" default:""`
 }
 
 type AppDetail struct {
@@ -77,6 +78,18 @@ func NewRouter(config ServerConfig, app sidecar.AppInfo) (*Router, error) {
 
 		routerServer.jwks = jwksManager
 		globalAuth := proxy.AuthHeadersFunc(httpjwt.JWKSAuthFunc(jwksManager))
+		routerServer.router.SetGlobalAuth(globalAuth)
+	}
+
+	if config.InjectActor != "" {
+		if len(config.JWKS) > 0 {
+			return nil, errors.New("cannot use INJECT_ACTOR with JWKS authentication")
+		}
+		globalAuth := proxy.AuthHeadersFunc(func(ctx context.Context, req *http.Request) (map[string]string, error) {
+			return map[string]string{
+				httpjwt.VerifiedJWTHeader: config.InjectActor,
+			}, nil
+		})
 		routerServer.router.SetGlobalAuth(globalAuth)
 	}
 
