@@ -3,6 +3,7 @@ package amqp
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/pentops/j5/lib/j5codec"
 	"github.com/pentops/log.go/log"
@@ -11,12 +12,20 @@ import (
 )
 
 type Publisher struct {
-	conn *Connection
+	connector *Connector
+	exchange  string
 }
 
-func NewPublisher(conn *Connection) (*Publisher, error) {
+func NewPublisher(config AMQPConfig, envName string) (*Publisher, error) {
+	connector := NewConnector(config)
+
+	exchange := config.Exchange
+	if exchange == "" {
+		exchange = fmt.Sprintf("o5.%s", envName)
+	}
 	cw := &Publisher{
-		conn: conn,
+		connector: connector,
+		exchange:  exchange,
 	}
 	return cw, nil
 }
@@ -24,23 +33,23 @@ func NewPublisher(conn *Connection) (*Publisher, error) {
 func (p *Publisher) Publish(ctx context.Context, message *messaging_pb.Message) error {
 	routingKey := messageToRoutingKey(message)
 
-	ch, err := p.conn.getChannel()
-	if err != nil {
-		return err
-	}
-
 	// eventbridge requires JSON bodies.
 	detail, err := j5codec.Global.ProtoToJSON(message.ProtoReflect())
 	if err != nil {
 		return err
 	}
 
-	log.WithFields(ctx, "exchange", p.conn.exchange, "routing_key", routingKey).Info("Publishing message to AMQP")
+	log.WithFields(ctx, "exchange", p.exchange, "routing_key", routingKey).Info("Publishing message to AMQP")
+
+	ch, err := p.connector.Channel()
+	if err != nil {
+		return err
+	}
 	return ch.PublishWithContext(ctx,
-		p.conn.exchange, // exchange
-		routingKey,      // routing key
-		false,           // mandatory
-		false,           // immediate
+		p.exchange, // exchange
+		routingKey, // routing key
+		false,      // mandatory
+		false,      // immediate
 		amqp.Publishing{
 			ContentType: "application/o5-message",
 			Body:        detail,

@@ -1,8 +1,6 @@
 module github.com/pentops/o5-runtime-sidecar
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.24.5
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250603165357-b52ab10f4468.1
@@ -17,20 +15,20 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/iancoleman/strcase v0.3.0
 	github.com/jackc/pgx/v5 v5.7.5
-	github.com/pentops/flowtest v0.0.0-20250731234319-af76c17154d5
-	github.com/pentops/j5 v0.0.0-20250804180511-490f30d7c098
+	github.com/pentops/flowtest v0.0.0-20251107012250-f144b2eacc1a
+	github.com/pentops/j5 v0.0.0-20251118201216-03120f6d3673
 	github.com/pentops/jwtauth v0.0.0-20250802182320-3552e00686f1
 	github.com/pentops/log.go v0.0.16
-	github.com/pentops/o5-messaging v0.0.0-20250804192812-419352c5dd36
+	github.com/pentops/o5-messaging v0.0.0-20250815175230-aa8a41a5ba43
 	github.com/pentops/runner v0.0.0-20250619010747-2bb7a5385324
 	github.com/pressly/goose/v3 v3.24.3
 	github.com/rabbitmq/amqp091-go v1.10.0
 	github.com/rs/cors v1.11.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/sync v0.16.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20250707201910-8d1bb00bc6a7
-	google.golang.org/grpc v1.73.0
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/genproto/googleapis/api v0.0.0-20250908214217-97024824d090
+	google.golang.org/grpc v1.76.0
+	google.golang.org/protobuf v1.36.10
 )
 
 require (
@@ -47,7 +45,7 @@ require (
 	github.com/aws/smithy-go v1.22.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.1 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.2 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -61,11 +59,11 @@ require (
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/crypto v0.39.0 // indirect
+	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/exp v0.0.0-20250531010427-b6e5de432a8b // indirect
-	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
+	golang.org/x/net v0.42.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250826171959-ef028d996bc1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

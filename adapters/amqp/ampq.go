@@ -15,47 +15,47 @@ type AMQPConfig struct {
 	Queue    string `env:"AMQP_QUEUE" default:""`
 }
 
-type Connection struct {
-	connLock   sync.Mutex
-	connection *amqp.Connection
-	channel    *amqp.Channel
-	exchange   string
+type Connector struct {
+	Config AMQPConfig
+
+	dialLock sync.Mutex
+
+	_conn    *amqp.Connection
+	_channel *amqp.Channel
 }
 
-func NewConnection(config AMQPConfig, envName string) (*Connection, error) {
-	conn, err := amqp.Dial(config.URI)
-	if err != nil {
-		return nil, err
+func NewConnector(config AMQPConfig) *Connector {
+	return &Connector{
+		Config: config,
 	}
-
-	exchange := config.Exchange
-	if exchange == "" {
-		exchange = fmt.Sprintf("o5.exchange.%s", envName)
-	}
-
-	cw := &Connection{
-		connection: conn,
-		exchange:   exchange,
-	}
-	return cw, nil
 }
 
-func (p *Connection) getChannel() (*amqp.Channel, error) {
-	p.connLock.Lock()
-	defer p.connLock.Unlock()
-	if p.channel != nil {
-		if p.channel.IsClosed() {
-			p.channel = nil
-		} else {
-			return p.channel, nil
+func (c *Connector) Channel() (*amqp.Channel, error) {
+	c.dialLock.Lock()
+	defer c.dialLock.Unlock()
+
+	// if we already have a valid channel, return it.
+	if c._channel != nil && !c._channel.IsClosed() {
+		return c._channel, nil
+	}
+
+	var err error
+
+	// if we don't have a valid connection, create it.
+	if c._conn == nil || c._conn.IsClosed() {
+		c._conn, err = amqp.Dial(c.Config.URI)
+		if err != nil {
+			return nil, err
 		}
 	}
-	ch, err := p.connection.Channel()
+
+	ch, err := c._conn.Channel()
 	if err != nil {
 		return nil, err
 	}
-	p.channel = ch
-	return ch, nil
+
+	c._channel = ch
+	return c._channel, nil
 }
 
 /* Topic Breakdown:

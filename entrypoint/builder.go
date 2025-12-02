@@ -90,29 +90,29 @@ func FromConfig(ctx context.Context, envConfig Config, awsConfig AWSProvider) (*
 			return nil, fmt.Errorf("cannot set both AMQP_URI and SQS_URL")
 		}
 
-		conn, err := amqp.NewConnection(envConfig.AMQPConfig, envConfig.EnvironmentName)
-		if err != nil {
-			return nil, fmt.Errorf("creating amqp connection: %w", err)
-		}
-
-		publisher, err := amqp.NewPublisher(conn)
+		publisher, err := amqp.NewPublisher(envConfig.AMQPConfig, envConfig.EnvironmentName)
 		if err != nil {
 			return nil, fmt.Errorf("creating amqp publisher: %w", err)
 		}
 		runtime.sender = publisher
 
+	}
+	if envConfig.AMQPConfig.Queue != "" {
+		if envConfig.AMQPConfig.URI == "" {
+			return nil, fmt.Errorf("AMQP_QUEUE set but AMQP_URI is empty")
+		}
+
 		router := messaging.NewRouter()
 		runtime.queueRouter = router
 
-		worker, err := amqp.NewSubscriber(conn, envConfig.AMQPConfig.Queue, router)
+		dlh := messaging.NewO5MessageDeadLetterHandler(runtime.sender, srcConfig)
+
+		worker, err := amqp.NewWorker(envConfig.AMQPConfig, router, dlh)
 		if err != nil {
 			return nil, fmt.Errorf("creating amqp publisher: %w", err)
 		}
 
 		runtime.queueWorker = worker
-
-	} else if len(envConfig.AMQPConfig.Queue) > 0 {
-		return nil, fmt.Errorf("AMQP_QUEUES set but AMQP_URI is empty")
 	}
 
 	pgConfigs := pgclient.NewConnectorSet(awsConfig, pgclient.EnvProvider{})
