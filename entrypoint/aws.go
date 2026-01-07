@@ -61,8 +61,12 @@ func (acb *AWSConfigBuilder) EventBridge(ctx context.Context) (EventBridgeAPI, e
 	return eventbridge.NewFromConfig(config), nil
 }
 
-func (acb *AWSConfigBuilder) Region() string {
-	return acb.config.Region
+func (acb *AWSConfigBuilder) Region() (string, error) {
+	config, err := acb.getConfig(context.Background())
+	if err != nil {
+		return "", err
+	}
+	return config.Region, nil
 }
 
 func (acb *AWSConfigBuilder) Credentials(ctx context.Context) (aws.CredentialsProvider, error) {
@@ -101,7 +105,7 @@ type AWSProvider interface {
 	SQS(context.Context) (SQSAPI, error)
 	EventBridge(context.Context) (EventBridgeAPI, error)
 
-	Region() string
+	Region() (string, error)
 	Credentials(context.Context) (aws.CredentialsProvider, error)
 }
 

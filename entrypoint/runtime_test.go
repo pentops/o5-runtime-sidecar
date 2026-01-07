@@ -26,8 +26,8 @@ func (ta TestAWS) EventBridge(ctx context.Context) (EventBridgeAPI, error) {
 	return nil, fmt.Errorf("Test Not Implemented")
 }
 
-func (ta TestAWS) Region() string {
-	return "local"
+func (ta TestAWS) Region() (string, error) {
+	return "local", nil
 }
 
 func (ta TestAWS) Credentials(ctx context.Context) (aws.CredentialsProvider, error) {

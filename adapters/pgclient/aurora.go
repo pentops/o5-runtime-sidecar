@@ -105,7 +105,10 @@ func (cb *CredBuilder) NewToken(ctx context.Context, lookupName string) (string,
 }
 
 func (cb *CredBuilder) newToken(ctx context.Context, config *AuroraConfig) (string, error) {
-	region := cb.provider.Region()
+	region, err := cb.provider.Region()
+	if err != nil {
+		return "", fmt.Errorf("failed to get aws region: %w", err)
+	}
 	creds, err := cb.provider.Credentials(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get aws credentials: %w", err)

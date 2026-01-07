@@ -30,7 +30,7 @@ var reValidDBEnvName = regexp.MustCompile(`^[A-Z0-9_]+$`)
 
 type AWSProvider interface {
 	Credentials(context.Context) (aws.CredentialsProvider, error)
-	Region() string
+	Region() (string, error)
 }
 
 type pgConnSet struct {
